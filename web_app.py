@@ -31,6 +31,7 @@ from compressor import (
     comparison_to_json_dict,
     comparison_to_sparse_json_dict,
     discover_gguf_models,
+    discover_system_gguf_models,
     hex_to_bytes,
     llama_cpp,
     token_trace_to_dicts,
@@ -231,18 +232,27 @@ def index() -> HTMLResponse:
 
 
 @app.get("/api/system")
-def api_system(scan_dir: str | None = Query(default=None)) -> dict:
-    roots = None
-    if scan_dir:
+async def api_system(
+    scan_dir: str | None = Query(default=None),
+    scan_system: bool = Query(default=False),
+) -> dict:
+    if scan_system:
+        models = await asyncio.to_thread(discover_system_gguf_models)
+        scan_mode = "system"
+    elif scan_dir:
         custom = Path(scan_dir).expanduser()
         if not custom.is_dir():
             raise HTTPException(status_code=400, detail=f"Directory not found: {custom}")
-        roots = [custom, Path.home() / ".lmstudio" / "models"]
-    models = discover_gguf_models(roots)
+        models = await asyncio.to_thread(discover_gguf_models, [custom])
+        scan_mode = "folder"
+    else:
+        models = await asyncio.to_thread(discover_gguf_models, None)
+        scan_mode = "env" if models else "none"
     return {
         "gpu_offload_supported": bool(llama_cpp.llama_supports_gpu_offload()),
         "default_cdf_bits": DEFAULT_CDF_BITS,
         "max_inline_bits": MAX_INLINE_BITS,
+        "scan_mode": scan_mode,
         "models": models,
     }
 

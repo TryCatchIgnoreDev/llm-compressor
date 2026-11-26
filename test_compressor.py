@@ -233,7 +233,16 @@ class TestLLMCompressorLifecycle(unittest.TestCase):
         if not SECOND_SMALL_MODEL.is_file():
             self.skipTest(f"Second test model not found: {SECOND_SMALL_MODEL}")
 
-        discovered = discover_gguf_models()
+        # Default discovery should not assume any app-specific directory when env var is unset.
+        prev_env = os.environ.pop("LLM_COMPRESSOR_MODELS_DIR", None)
+        try:
+            self.assertEqual(discover_gguf_models(), [])
+        finally:
+            if prev_env is not None:
+                os.environ["LLM_COMPRESSOR_MODELS_DIR"] = prev_env
+
+        # Explicit folder discovery should find our local test models and skip mmproj files.
+        discovered = discover_gguf_models([self.model_path.parent.parent])
         self.assertGreaterEqual(len(discovered), 2)
         self.assertFalse(any(m["name"].lower().startswith("mmproj") for m in discovered))
 

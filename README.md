@@ -13,7 +13,7 @@ Lossless text compression, decompression, and side-by-side language model benchm
 
 - **100% Lossless Round-Trip Compression**: Encodes UTF-8 text into a compact `.llmc` binary format (with magic header, metadata, and arithmetic-coded bitstream) and verifies exact byte-for-byte / SHA-256 reconstruction.
 - **Interactive Web UI (FastAPI + SSE)**:
-  - Auto-discovers local `.gguf` models (e.g., LM Studio directories) or accepts any custom `.gguf` path.
+  - Point to any local models folder (saved in browser `localStorage` or via `LLM_COMPRESSOR_MODELS_DIR`), paste a direct `.gguf` file path, or click **Scan System** for an on-demand system-wide `.gguf` scan (no app-specific paths assumed).
   - Compares **Model A vs. Model B** sequentially (freeing VRAM between models) with live token-by-token progress bars.
   - Visualizes a **Token-Level Surprise Heatmap (`-log₂ P`)** showing exactly which tokens each model predicted confidently vs. found surprising.
   - Exports **Full (19-field)** and **Sparse (5-field + top surprises)** per-token JSON reports.
@@ -137,7 +137,7 @@ When running `python cli.py web`:
 | Method & Path | Description |
 | --- | --- |
 | `GET /` | Web UI |
-| `GET /api/system` | GPU offload status & discovered `.gguf` models (`?scan_dir=...`) |
+| `GET /api/system` | GPU offload status & GGUF discovery (`?scan_dir=...` or `?scan_system=true`) |
 | `POST /api/compare` | Run Model A vs. Model B comparison (SSE stream) |
 | `POST /api/single/compress` | Compress text with a single model (SSE stream) |
 | `POST /api/single/decompress` | Decompress raw `.llmc` binary payload |

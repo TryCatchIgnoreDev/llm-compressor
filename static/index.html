@@ -487,8 +487,9 @@
       </div>
       <div class="header-actions">
         <span id="gpu-pill" class="pill">Checking system...</span>
-        <input id="scan-dir-input" type="text" placeholder="Custom GGUF folder (optional)" style="width:220px;" />
-        <button id="refresh-models-btn" class="btn btn-secondary" type="button">Refresh Models</button>
+        <input id="scan-dir-input" type="text" placeholder="Models folder path (e.g. /path/to/gguf)" style="width:250px;" />
+        <button id="refresh-models-btn" class="btn btn-secondary" type="button">Load Folder</button>
+        <button id="scan-system-btn" class="btn btn-secondary" type="button" title="Scan local drives for .gguf model files">Scan System</button>
       </div>
     </header>
 
@@ -513,7 +514,7 @@
           </div>
           <div class="field">
             <label for="model-a-path">or Full .gguf File Path</label>
-            <input id="model-a-path" type="text" class="mono" placeholder="C:\path\model-a.gguf" />
+            <input id="model-a-path" type="text" class="mono" placeholder="/path/to/model-a.gguf" />
           </div>
           <div class="field">
             <label for="gpu-layers-a">GPU Layers (-1 = Full GPU, 0 = CPU Only, or layer count)</label>
@@ -532,7 +533,7 @@
           </div>
           <div class="field">
             <label for="model-b-path">or Full .gguf File Path</label>
-            <input id="model-b-path" type="text" class="mono" placeholder="C:\path\model-b.gguf" />
+            <input id="model-b-path" type="text" class="mono" placeholder="/path/to/model-b.gguf" />
           </div>
           <div class="field">
             <label for="gpu-layers-b">GPU Layers (-1 = Full GPU, 0 = CPU Only, or layer count)</label>
@@ -897,7 +898,7 @@
         if (models.length === 0) {
           const opt = document.createElement("option");
           opt.value = "";
-          opt.textContent = "No GGUF auto-discovered — enter path below";
+          opt.textContent = "No models loaded — set a folder above, click Scan System, or enter a path below";
           sel.appendChild(opt);
           continue;
         }
@@ -918,30 +919,66 @@
       }
     }
 
-    async function loadSystemInfo() {
+    const MODELS_DIR_STORAGE_KEY = "llm_compressor_models_dir";
+
+    async function loadSystemInfo({ scanSystem = false } = {}) {
+      showError("");
       const scanDir = $("scan-dir-input").value.trim();
-      const url = scanDir ? `/api/system?scan_dir=${encodeURIComponent(scanDir)}` : "/api/system";
-      const res = await fetch(url);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Failed to load system info.");
-      }
-      const data = await res.json();
-      state.models = data.models || [];
+      const refreshBtn = $("refresh-models-btn");
+      const scanBtn = $("scan-system-btn");
       const pill = $("gpu-pill");
-      if (data.gpu_offload_supported) {
-        pill.textContent = `GPU Offload: Active • ${state.models.length} GGUF models found`;
-        pill.className = "pill ok";
-      } else {
-        pill.textContent = `CPU Mode • ${state.models.length} GGUF models found`;
-        pill.className = "pill";
+
+      if (!scanSystem) {
+        try {
+          if (scanDir) {
+            localStorage.setItem(MODELS_DIR_STORAGE_KEY, scanDir);
+          } else {
+            localStorage.removeItem(MODELS_DIR_STORAGE_KEY);
+          }
+        } catch {}
       }
-      $("cmp-cdf-bits").value = data.default_cdf_bits || 28;
-      $("single-comp-cdf").value = data.default_cdf_bits || 28;
-      state.maxInlineBits = data.max_inline_bits || 10000;
-      updateBitInputStatus();
-      updateHexInputStatus();
-      populateModelSelects(state.models);
+
+      const params = new URLSearchParams();
+      if (scanSystem) {
+        params.set("scan_system", "true");
+        pill.textContent = "Scanning system for .gguf models...";
+        pill.className = "pill";
+        scanBtn.disabled = true;
+        refreshBtn.disabled = true;
+      } else if (scanDir) {
+        params.set("scan_dir", scanDir);
+      }
+      const query = params.toString();
+      const url = query ? `/api/system?${query}` : "/api/system";
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to load system info.");
+        }
+        const data = await res.json();
+        state.models = data.models || [];
+        const modelSummary = state.models.length > 0
+          ? `${state.models.length} GGUF models loaded`
+          : "Set a folder or click Scan System";
+        if (data.gpu_offload_supported) {
+          pill.textContent = `GPU Offload: Active • ${modelSummary}`;
+          pill.className = "pill ok";
+        } else {
+          pill.textContent = `CPU Mode • ${modelSummary}`;
+          pill.className = "pill";
+        }
+        $("cmp-cdf-bits").value = data.default_cdf_bits || 28;
+        $("single-comp-cdf").value = data.default_cdf_bits || 28;
+        state.maxInlineBits = data.max_inline_bits || 10000;
+        updateBitInputStatus();
+        updateHexInputStatus();
+        populateModelSelects(state.models);
+      } finally {
+        scanBtn.disabled = false;
+        refreshBtn.disabled = false;
+      }
     }
 
     async function consumeSSE(response, onEvent) {
@@ -1833,7 +1870,14 @@
     $("single-dec-bits-btn").addEventListener("click", runSingleDecompressBits);
     $("single-hex-input").addEventListener("input", updateHexInputStatus);
     $("single-bit-input").addEventListener("input", updateBitInputStatus);
-    $("refresh-models-btn").addEventListener("click", () => loadSystemInfo().catch((e) => showError(e.message)));
+    $("refresh-models-btn").addEventListener("click", () => loadSystemInfo({ scanSystem: false }).catch((e) => showError(e.message)));
+    $("scan-system-btn").addEventListener("click", () => loadSystemInfo({ scanSystem: true }).catch((e) => showError(e.message)));
+    $("scan-dir-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        loadSystemInfo({ scanSystem: false }).catch((err) => showError(err.message));
+      }
+    });
 
     document.querySelectorAll(".dec-mode-btn").forEach((btn) => {
       btn.addEventListener("click", () => switchDecodeMode(btn.dataset.mode));
@@ -1934,6 +1978,10 @@
     bindSelectAndPath("single-comp-select", "single-comp-path");
     bindSelectAndPath("single-dec-select", "single-dec-path");
 
+    try {
+      const savedDir = localStorage.getItem(MODELS_DIR_STORAGE_KEY);
+      if (savedDir) $("scan-dir-input").value = savedDir;
+    } catch {}
     $("compare-text").value = PRESETS.shannon;
     updateByteCount();
     updateBitInputStatus();

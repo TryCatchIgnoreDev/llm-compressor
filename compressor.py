@@ -322,37 +322,136 @@ class ComparisonResult:
         )
 
 
-def discover_gguf_models(search_roots: Sequence[Path] | None = None) -> list[dict[str, Any]]:
-    """Discover standalone LLM `.gguf` files in standard local directories (excluding mmproj)."""
-    roots = list(search_roots) if search_roots is not None else [
-        Path.home() / ".lmstudio" / "models",
-    ]
+_SYSTEM_SCAN_SKIP_DIRS = frozenset(
+    {
+        "windows",
+        "program files",
+        "program files (x86)",
+        "programdata",
+        "$recycle.bin",
+        "system volume information",
+        "recovery",
+        "perflogs",
+        "msocache",
+        "node_modules",
+        ".git",
+        ".hg",
+        ".svn",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".tox",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".npm",
+        ".cargo",
+        ".rustup",
+        ".gradle",
+        ".nuget",
+        "temp",
+        "tmp",
+        "proc",
+        "sys",
+        "dev",
+        "run",
+        "boot",
+        "sbin",
+        "bin",
+        "lib",
+        "lib64",
+        "system",
+        "applications",
+    }
+)
+
+
+def _env_model_roots() -> list[Path]:
+    raw = os.environ.get("LLM_COMPRESSOR_MODELS_DIR", "").strip()
+    if not raw:
+        return []
+    return [Path(part).expanduser() for part in raw.split(os.pathsep) if part.strip()]
+
+
+def discover_gguf_models(
+    search_roots: Sequence[Path] | None = None,
+    *,
+    skip_system_dirs: bool = False,
+    max_depth: int | None = None,
+) -> list[dict[str, Any]]:
+    """Discover standalone LLM `.gguf` files in the provided roots (excluding mmproj).
+
+    When `search_roots` is None, only directories listed in the optional
+    `LLM_COMPRESSOR_MODELS_DIR` environment variable are scanned (no app-specific
+    default paths are assumed).
+    """
+    roots = list(search_roots) if search_roots is not None else _env_model_roots()
     found: list[dict[str, Any]] = []
     seen: set[Path] = set()
 
     for root in roots:
-        if not root.is_dir():
+        try:
+            root_resolved = root.expanduser().resolve()
+        except OSError:
             continue
-        for path in root.rglob("*.gguf"):
-            resolved = path.resolve()
-            if resolved in seen or not resolved.is_file():
-                continue
-            if resolved.name.lower().startswith("mmproj"):
-                continue
-            seen.add(resolved)
-            size_bytes = resolved.stat().st_size
-            found.append(
-                {
-                    "name": resolved.name,
-                    "path": str(resolved),
-                    "size_bytes": size_bytes,
-                    "size_gb": round(size_bytes / (1024 ** 3), 2),
-                    "parent": resolved.parent.name,
-                }
-            )
+        if not root_resolved.is_dir():
+            continue
+        base_depth = len(root_resolved.parts)
+        for dirpath, dirnames, filenames in os.walk(
+            root_resolved,
+            topdown=True,
+            onerror=lambda _err: None,
+            followlinks=False,
+        ):
+            cur_path = Path(dirpath)
+            depth = len(cur_path.parts) - base_depth
+            if max_depth is not None and depth >= max_depth:
+                dirnames[:] = []
+            elif skip_system_dirs:
+                dirnames[:] = [
+                    d for d in dirnames if d.lower() not in _SYSTEM_SCAN_SKIP_DIRS
+                ]
+
+            for fname in filenames:
+                low = fname.lower()
+                if not low.endswith(".gguf") or low.startswith("mmproj"):
+                    continue
+                candidate = cur_path / fname
+                try:
+                    resolved = candidate.resolve()
+                    if resolved in seen or not resolved.is_file():
+                        continue
+                    size_bytes = resolved.stat().st_size
+                except OSError:
+                    continue
+                seen.add(resolved)
+                found.append(
+                    {
+                        "name": resolved.name,
+                        "path": str(resolved),
+                        "size_bytes": size_bytes,
+                        "size_gb": round(size_bytes / (1024 ** 3), 2),
+                        "parent": resolved.parent.name,
+                    }
+                )
 
     found.sort(key=lambda item: (item["size_bytes"], item["name"].lower()))
     return found
+
+
+def discover_system_gguf_models(*, max_depth: int = 8) -> list[dict[str, Any]]:
+    """Scan local user directories and mounted drives for `.gguf` files, skipping OS/system dirs."""
+    roots: list[Path] = [Path.home()]
+    if sys.platform == "win32":
+        for letter in "CDEFGHIJKLMNOPQRSTUVWXYZ":
+            drive = Path(f"{letter}:\\")
+            if drive.exists():
+                roots.append(drive)
+    else:
+        for extra in ("/mnt", "/media", "/Volumes", "/opt", "/srv", "/var/lib/ollama", "/usr/share/ollama"):
+            p = Path(extra)
+            if p.is_dir():
+                roots.append(p)
+    return discover_gguf_models(roots, skip_system_dirs=True, max_depth=max_depth)
 
 
 def _compute_stream_lengths(num_tokens: int, streams: int) -> list[int]:

@@ -98,6 +98,12 @@ class TestWebApp(unittest.TestCase):
             data = json.loads(resp.read().decode("utf-8"))
             self.assertIn("models", data)
             self.assertEqual(data["max_inline_bits"], 10000)
+
+        scan_root = urllib.parse.quote(str(SMALL_MODEL_A.parent.parent))
+        with urllib.request.urlopen(f"{self.base_url}/api/system?scan_dir={scan_root}") as resp:
+            self.assertEqual(resp.status, 200)
+            data = json.loads(resp.read().decode("utf-8"))
+            self.assertEqual(data["scan_mode"], "folder")
             self.assertGreaterEqual(len(data["models"]), 2)
 
     def test_compare_sse_download_and_single_decompress(self) -> None:
