@@ -976,11 +976,39 @@
     }
 
     const MODELS_DIR_STORAGE_KEY = "llm_compressor_models_dir";
+    const CACHED_MODELS_STORAGE_KEY = "llm_compressor_cached_models";
     let activeScanController = null;
 
-    function applySystemData(data) {
+    function readCachedModels() {
+      try {
+        const raw = localStorage.getItem(CACHED_MODELS_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveCachedModels(models) {
+      try {
+        if (Array.isArray(models) && models.length > 0) {
+          localStorage.setItem(CACHED_MODELS_STORAGE_KEY, JSON.stringify(models));
+        } else {
+          localStorage.removeItem(CACHED_MODELS_STORAGE_KEY);
+        }
+      } catch {}
+    }
+
+    function applySystemData(data, { persistModels = true, fallbackToCache = false } = {}) {
       const pill = $("gpu-pill");
-      state.models = data.models || [];
+      let models = Array.isArray(data.models) ? data.models : [];
+      if (models.length === 0 && fallbackToCache) {
+        models = readCachedModels();
+      } else if (persistModels) {
+        saveCachedModels(models);
+      }
+      state.models = models;
       const modelSummary = state.models.length > 0
         ? `${state.models.length} GGUF models loaded`
         : "Set a folder or click Scan System";
@@ -1060,7 +1088,7 @@
       }
     }
 
-    async function loadSystemInfo({ scanSystem = false } = {}) {
+    async function loadSystemInfo({ scanSystem = false, isInitialLoad = false } = {}) {
       if (scanSystem) {
         return runSystemScanStream();
       }
@@ -1088,7 +1116,8 @@
           throw new Error(err.detail || "Failed to load system info.");
         }
         const data = await res.json();
-        applySystemData(data);
+        const useCacheFallback = isInitialLoad && !scanDir;
+        applySystemData(data, { persistModels: !useCacheFallback, fallbackToCache: useCacheFallback });
       } finally {
         scanBtn.disabled = false;
         refreshBtn.disabled = false;
@@ -2103,7 +2132,7 @@
     updateByteCount();
     updateBitInputStatus();
     updateHexInputStatus();
-    loadSystemInfo().catch((e) => showError(e.message));
+    loadSystemInfo({ isInitialLoad: true }).catch((e) => showError(e.message));
   </script>
 </body>
 </html>
