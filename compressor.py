@@ -377,6 +377,8 @@ def discover_gguf_models(
     *,
     skip_system_dirs: bool = False,
     max_depth: int | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    cancel_event: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Discover standalone LLM `.gguf` files in the provided roots (excluding mmproj).
 
@@ -387,14 +389,40 @@ def discover_gguf_models(
     roots = list(search_roots) if search_roots is not None else _env_model_roots()
     found: list[dict[str, Any]] = []
     seen: set[Path] = set()
+    dirs_scanned = 0
+    total_roots = len(roots)
+    last_emit = 0.0
 
-    for root in roots:
+    def emit(root_idx: int, current_dir: str, latest_model: str | None = None, force: bool = False) -> None:
+        nonlocal last_emit
+        if progress_callback is None:
+            return
+        now = time.monotonic()
+        if not force and (now - last_emit) < 0.08:
+            return
+        last_emit = now
+        progress_callback(
+            {
+                "type": "progress",
+                "dirs_scanned": dirs_scanned,
+                "found_count": len(found),
+                "current_dir": current_dir,
+                "root_index": root_idx,
+                "total_roots": total_roots,
+                "latest_model": latest_model,
+            }
+        )
+
+    for root_idx, root in enumerate(roots, start=1):
+        if cancel_event is not None and cancel_event.is_set():
+            break
         try:
             root_resolved = root.expanduser().resolve()
         except OSError:
             continue
         if not root_resolved.is_dir():
             continue
+        emit(root_idx, str(root_resolved), force=True)
         base_depth = len(root_resolved.parts)
         for dirpath, dirnames, filenames in os.walk(
             root_resolved,
@@ -402,6 +430,9 @@ def discover_gguf_models(
             onerror=lambda _err: None,
             followlinks=False,
         ):
+            if cancel_event is not None and cancel_event.is_set():
+                break
+            dirs_scanned += 1
             cur_path = Path(dirpath)
             depth = len(cur_path.parts) - base_depth
             if max_depth is not None and depth >= max_depth:
@@ -410,6 +441,8 @@ def discover_gguf_models(
                 dirnames[:] = [
                     d for d in dirnames if d.lower() not in _SYSTEM_SCAN_SKIP_DIRS
                 ]
+
+            emit(root_idx, dirpath)
 
             for fname in filenames:
                 low = fname.lower()
@@ -433,12 +466,18 @@ def discover_gguf_models(
                         "parent": resolved.parent.name,
                     }
                 )
+                emit(root_idx, dirpath, latest_model=resolved.name, force=True)
 
     found.sort(key=lambda item: (item["size_bytes"], item["name"].lower()))
     return found
 
 
-def discover_system_gguf_models(*, max_depth: int = 8) -> list[dict[str, Any]]:
+def discover_system_gguf_models(
+    *,
+    max_depth: int = 8,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    cancel_event: Any | None = None,
+) -> list[dict[str, Any]]:
     """Scan local user directories and mounted drives for `.gguf` files, skipping OS/system dirs."""
     roots: list[Path] = [Path.home()]
     if sys.platform == "win32":
@@ -451,7 +490,13 @@ def discover_system_gguf_models(*, max_depth: int = 8) -> list[dict[str, Any]]:
             p = Path(extra)
             if p.is_dir():
                 roots.append(p)
-    return discover_gguf_models(roots, skip_system_dirs=True, max_depth=max_depth)
+    return discover_gguf_models(
+        roots,
+        skip_system_dirs=True,
+        max_depth=max_depth,
+        progress_callback=progress_callback,
+        cancel_event=cancel_event,
+    )
 
 
 def _compute_stream_lengths(num_tokens: int, streams: int) -> list[int]:

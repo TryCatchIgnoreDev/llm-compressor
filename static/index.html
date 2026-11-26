@@ -475,6 +475,50 @@
       margin-top: 6px;
     }
 
+    .scan-progress-box {
+      display: none;
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px;
+    }
+
+    .scan-progress-box.visible { display: block; }
+
+    .scan-track {
+      position: relative;
+      height: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 8px 0 6px;
+    }
+
+    .scan-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 38%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(56, 189, 248, 0.25), #38bdf8 50%, #34d399 100%);
+      animation: scan-slide 1.25s ease-in-out infinite;
+    }
+
+    @keyframes scan-slide {
+      0%   { transform: translateX(-110%); }
+      100% { transform: translateX(280%); }
+    }
+
+    .scan-path {
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -492,6 +536,18 @@
         <button id="scan-system-btn" class="btn btn-secondary" type="button" title="Scan local drives for .gguf model files">Scan System</button>
       </div>
     </header>
+
+    <div id="scan-progress" class="scan-progress-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <span id="scan-progress-label" style="font-size:0.86rem; font-weight:600;">Scanning system for .gguf models...</span>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="scan-progress-stats" class="mono" style="font-size:0.8rem; color:#7dd3fc;">0 folders · 0 models</span>
+          <button id="cancel-scan-btn" class="btn btn-secondary btn-sm" type="button">Cancel</button>
+        </div>
+      </div>
+      <div class="scan-track"><div id="scan-progress-fill" class="scan-fill"></div></div>
+      <div id="scan-progress-path" class="scan-path">Starting scan...</div>
+    </div>
 
     <div class="tabs">
       <button class="tab-btn active" data-tab="compare">Model A vs Model B Comparison</button>
@@ -920,36 +976,110 @@
     }
 
     const MODELS_DIR_STORAGE_KEY = "llm_compressor_models_dir";
+    let activeScanController = null;
+
+    function applySystemData(data) {
+      const pill = $("gpu-pill");
+      state.models = data.models || [];
+      const modelSummary = state.models.length > 0
+        ? `${state.models.length} GGUF models loaded`
+        : "Set a folder or click Scan System";
+      if (data.gpu_offload_supported) {
+        pill.textContent = `GPU Offload: Active • ${modelSummary}`;
+        pill.className = "pill ok";
+      } else {
+        pill.textContent = `CPU Mode • ${modelSummary}`;
+        pill.className = "pill";
+      }
+      $("cmp-cdf-bits").value = data.default_cdf_bits || 28;
+      $("single-comp-cdf").value = data.default_cdf_bits || 28;
+      state.maxInlineBits = data.max_inline_bits || 10000;
+      updateBitInputStatus();
+      updateHexInputStatus();
+      populateModelSelects(state.models);
+    }
+
+    async function runSystemScanStream() {
+      showError("");
+      const refreshBtn = $("refresh-models-btn");
+      const scanBtn = $("scan-system-btn");
+      const pill = $("gpu-pill");
+      const box = $("scan-progress");
+      const label = $("scan-progress-label");
+      const stats = $("scan-progress-stats");
+      const pathEl = $("scan-progress-path");
+
+      if (activeScanController) {
+        activeScanController.abort();
+      }
+      const controller = new AbortController();
+      activeScanController = controller;
+
+      pill.textContent = "Scanning system for .gguf models...";
+      pill.className = "pill";
+      scanBtn.disabled = true;
+      refreshBtn.disabled = true;
+      label.textContent = "Scanning local drives for .gguf models...";
+      stats.textContent = "0 folders · 0 models";
+      pathEl.textContent = "Starting scan...";
+      box.classList.add("visible");
+
+      try {
+        const res = await fetch("/api/system/scan_stream", { signal: controller.signal });
+        await consumeSSE(res, (ev) => {
+          if (ev.type === "progress") {
+            const rootNote = ev.total_roots > 1 ? ` (root ${ev.root_index}/${ev.total_roots})` : "";
+            label.textContent = `Scanning local drives for .gguf models...${rootNote}`;
+            stats.textContent = `${(ev.dirs_scanned || 0).toLocaleString("en-US")} folders · ${ev.found_count || 0} models`;
+            pathEl.textContent = ev.latest_model
+              ? `Found: ${ev.latest_model} — ${ev.current_dir}`
+              : (ev.current_dir || "");
+          } else if (ev.type === "complete") {
+            applySystemData(ev);
+            label.textContent = `Scan complete in ${ev.elapsed_seconds}s`;
+            stats.textContent = `${(ev.models || []).length} models found`;
+          } else if (ev.type === "error") {
+            throw new Error(ev.message || "System scan failed.");
+          }
+        });
+      } catch (err) {
+        if (err && err.name === "AbortError") {
+          pill.textContent = state.models.length > 0
+            ? `${state.models.length} GGUF models loaded`
+            : "Scan cancelled";
+        } else {
+          showError(err.message || String(err));
+        }
+      } finally {
+        if (activeScanController === controller) {
+          activeScanController = null;
+        }
+        box.classList.remove("visible");
+        scanBtn.disabled = false;
+        refreshBtn.disabled = false;
+      }
+    }
 
     async function loadSystemInfo({ scanSystem = false } = {}) {
+      if (scanSystem) {
+        return runSystemScanStream();
+      }
       showError("");
       const scanDir = $("scan-dir-input").value.trim();
       const refreshBtn = $("refresh-models-btn");
       const scanBtn = $("scan-system-btn");
-      const pill = $("gpu-pill");
 
-      if (!scanSystem) {
-        try {
-          if (scanDir) {
-            localStorage.setItem(MODELS_DIR_STORAGE_KEY, scanDir);
-          } else {
-            localStorage.removeItem(MODELS_DIR_STORAGE_KEY);
-          }
-        } catch {}
-      }
+      try {
+        if (scanDir) {
+          localStorage.setItem(MODELS_DIR_STORAGE_KEY, scanDir);
+        } else {
+          localStorage.removeItem(MODELS_DIR_STORAGE_KEY);
+        }
+      } catch {}
 
-      const params = new URLSearchParams();
-      if (scanSystem) {
-        params.set("scan_system", "true");
-        pill.textContent = "Scanning system for .gguf models...";
-        pill.className = "pill";
-        scanBtn.disabled = true;
-        refreshBtn.disabled = true;
-      } else if (scanDir) {
-        params.set("scan_dir", scanDir);
-      }
-      const query = params.toString();
-      const url = query ? `/api/system?${query}` : "/api/system";
+      const url = scanDir ? `/api/system?scan_dir=${encodeURIComponent(scanDir)}` : "/api/system";
+      scanBtn.disabled = true;
+      refreshBtn.disabled = true;
 
       try {
         const res = await fetch(url);
@@ -958,23 +1088,7 @@
           throw new Error(err.detail || "Failed to load system info.");
         }
         const data = await res.json();
-        state.models = data.models || [];
-        const modelSummary = state.models.length > 0
-          ? `${state.models.length} GGUF models loaded`
-          : "Set a folder or click Scan System";
-        if (data.gpu_offload_supported) {
-          pill.textContent = `GPU Offload: Active • ${modelSummary}`;
-          pill.className = "pill ok";
-        } else {
-          pill.textContent = `CPU Mode • ${modelSummary}`;
-          pill.className = "pill";
-        }
-        $("cmp-cdf-bits").value = data.default_cdf_bits || 28;
-        $("single-comp-cdf").value = data.default_cdf_bits || 28;
-        state.maxInlineBits = data.max_inline_bits || 10000;
-        updateBitInputStatus();
-        updateHexInputStatus();
-        populateModelSelects(state.models);
+        applySystemData(data);
       } finally {
         scanBtn.disabled = false;
         refreshBtn.disabled = false;
@@ -1872,6 +1986,9 @@
     $("single-bit-input").addEventListener("input", updateBitInputStatus);
     $("refresh-models-btn").addEventListener("click", () => loadSystemInfo({ scanSystem: false }).catch((e) => showError(e.message)));
     $("scan-system-btn").addEventListener("click", () => loadSystemInfo({ scanSystem: true }).catch((e) => showError(e.message)));
+    $("cancel-scan-btn").addEventListener("click", () => {
+      if (activeScanController) activeScanController.abort();
+    });
     $("scan-dir-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();

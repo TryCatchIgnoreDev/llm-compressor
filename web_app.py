@@ -257,6 +257,57 @@ async def api_system(
     }
 
 
+@app.get("/api/system/scan_stream")
+async def api_system_scan_stream(request: Request) -> StreamingResponse:
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[dict | None] = asyncio.Queue()
+    cancel_event = threading.Event()
+
+    def push_event(ev: dict) -> None:
+        loop.call_soon_threadsafe(queue.put_nowait, ev)
+
+    def worker() -> None:
+        t0 = time.perf_counter()
+        try:
+            models = discover_system_gguf_models(
+                progress_callback=push_event,
+                cancel_event=cancel_event,
+            )
+            push_event(
+                {
+                    "type": "complete",
+                    "cancelled": cancel_event.is_set(),
+                    "elapsed_seconds": round(time.perf_counter() - t0, 2),
+                    "gpu_offload_supported": bool(llama_cpp.llama_supports_gpu_offload()),
+                    "default_cdf_bits": DEFAULT_CDF_BITS,
+                    "max_inline_bits": MAX_INLINE_BITS,
+                    "scan_mode": "system",
+                    "models": models,
+                }
+            )
+        except Exception as exc:
+            push_event({"type": "error", "message": str(exc)})
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    async def event_stream():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    cancel_event.set()
+                    break
+                item = await queue.get()
+                if item is None:
+                    break
+                yield _sse_line(item)
+        finally:
+            cancel_event.set()
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 @app.post("/api/compare")
 async def api_compare(req: CompareRequest) -> StreamingResponse:
     if not _RUN_LOCK.acquire(blocking=False):
