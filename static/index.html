@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Compression Lab — Compression is Intelligence</title>
+  <style>
+    :root {
+      --bg: #080d1a;
+      --surface: #0f172a;
+      --surface-2: #16213a;
+      --border: #253456;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --model-a: #f59e0b;
+      --model-a-bg: rgba(245, 158, 11, 0.12);
+      --model-b: #38bdf8;
+      --model-b-bg: rgba(56, 189, 248, 0.12);
+      --ok: #10b981;
+      --ok-bg: rgba(16, 185, 129, 0.14);
+      --err: #ef4444;
+      --err-bg: rgba(239, 68, 68, 0.14);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: radial-gradient(circle at 15% -10%, #172554 0%, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 20px 64px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.65rem;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .pill.ok {
+      border-color: rgba(16, 185, 129, 0.45);
+      background: var(--ok-bg);
+      color: #6ee7b7;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+      background: #1e293b;
+      color: #fff;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.25);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .card-a { border-top: 3px solid var(--model-a); }
+    .card-b { border-top: 3px solid var(--model-b); }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 0 14px;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .badge-a {
+      background: var(--model-a-bg);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+    }
+
+    .badge-b {
+      background: var(--model-b-bg);
+      color: #7dd3fc;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: #60a5fa;
+    }
+
+    input.mono, textarea.mono {
+      font-family: var(--mono);
+      font-size: 0.84rem;
+    }
+
+    .field { margin-bottom: 12px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .row-inline {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+
+    .row-inline > * { flex: 1; min-width: 140px; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 9px;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s ease, opacity 0.15s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover:not(:disabled) { background: #1d4ed8; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 12px;
+      font-size: 0.82rem;
+    }
+
+    .btn-secondary:hover:not(:disabled) { background: #1e2e4f; }
+
+    .btn-sm { padding: 6px 11px; font-size: 0.8rem; }
+    .heatmap-toggle.active,
+    .dec-mode-btn.active,
+    .fmt-toggle.active,
+    .json-scope-btn.active,
+    .json-detail-btn.active {
+      background: #1e293b;
+      border-color: #60a5fa;
+      color: #fff;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .meta-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .progress-box {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+
+    .progress-box.visible { display: block; }
+
+    .prog-row { margin-bottom: 12px; }
+    .prog-row:last-child { margin-bottom: 0; }
+    .prog-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.84rem;
+      margin-bottom: 6px;
+    }
+
+    .prog-track {
+      height: 10px;
+      background: var(--bg);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .prog-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 0.12s linear;
+    }
+
+    .prog-fill.a { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .prog-fill.b { background: linear-gradient(90deg, #0284c7, #38bdf8); }
+
+    .error-banner {
+      display: none;
+      background: var(--err-bg);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+    .error-banner.visible { display: block; }
+
+    .winner-banner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 20px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(56, 189, 248, 0.12));
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      margin-bottom: 16px;
+    }
+
+    .winner-banner h2 {
+      margin: 0;
+      font-size: 1.15rem;
+    }
+
+    .winner-banner p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .bar-chart { display: flex; flex-direction: column; gap: 11px; }
+
+    .bar-item {
+      display: grid;
+      grid-template-columns: 185px 1fr 125px;
+      gap: 12px;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 700px) {
+      .bar-item { grid-template-columns: 1fr; gap: 4px; }
+    }
+
+    .bar-track {
+      height: 20px;
+      background: var(--bg);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.35s ease;
+    }
+
+    .bar-raw { background: #475569; }
+    .bar-zlib { background: #8b5cf6; }
+    .bar-a { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .bar-b { background: linear-gradient(90deg, #0284c7, #38bdf8); }
+
+    .num {
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+    }
+
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    td.num-cell, th.num-cell {
+      text-align: right;
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .delta-pos { color: #6ee7b7; font-weight: 600; }
+    .delta-neg { color: #fca5a5; font-weight: 600; }
+
+    .token-heatmap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      max-height: 360px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 0.83rem;
+    }
+
+    .tok-chip {
+      padding: 2px 5px;
+      border-radius: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      white-space: pre;
+      cursor: help;
+      color: #f8fafc;
+    }
+
+    .verify-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .verify-grid { grid-template-columns: 1fr; }
+    }
+
+    .verify-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .verify-box pre {
+      margin: 8px 0 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      max-height: 170px;
+      overflow-y: auto;
+      color: #cbd5e1;
+    }
+
+    .hash-line {
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      color: var(--muted);
+      word-break: break-all;
+      margin-top: 6px;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <h1>LLM Compression Lab</h1>
+        <p>3Blue1Brown "Compression is Intelligence" — GGUF + KV-Cache + 62-bit Arithmetic Coding</p>
+      </div>
+      <div class="header-actions">
+        <span id="gpu-pill" class="pill">Checking system...</span>
+        <input id="scan-dir-input" type="text" placeholder="Custom GGUF folder (optional)" style="width:220px;" />
+        <button id="refresh-models-btn" class="btn btn-secondary" type="button">Refresh Models</button>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="compare">Model A vs Model B Comparison</button>
+      <button class="tab-btn" data-tab="single">Single Model (.llmc Compress / Decompress)</button>
+    </div>
+
+    <div id="error-banner" class="error-banner"></div>
+
+    <!-- TAB 1: COMPARE -->
+    <section id="tab-compare" class="tab-panel active">
+      <div class="grid-2">
+        <div class="card card-a">
+          <div class="card-title">
+            <span>Model A</span>
+            <span class="badge-a">1st</span>
+          </div>
+          <div class="field">
+            <label for="model-a-select">Select Discovered GGUF Model</label>
+            <select id="model-a-select"></select>
+          </div>
+          <div class="field">
+            <label for="model-a-path">or Full .gguf File Path</label>
+            <input id="model-a-path" type="text" class="mono" placeholder="C:\path\model-a.gguf" />
+          </div>
+          <div class="field">
+            <label for="gpu-layers-a">GPU Layers (-1 = Full GPU, 0 = CPU Only, or layer count)</label>
+            <input id="gpu-layers-a" type="number" value="-1" min="-1" max="1000" />
+          </div>
+        </div>
+
+        <div class="card card-b">
+          <div class="card-title">
+            <span>Model B</span>
+            <span class="badge-b">2nd</span>
+          </div>
+          <div class="field">
+            <label for="model-b-select">Select Discovered GGUF Model</label>
+            <select id="model-b-select"></select>
+          </div>
+          <div class="field">
+            <label for="model-b-path">or Full .gguf File Path</label>
+            <input id="model-b-path" type="text" class="mono" placeholder="C:\path\model-b.gguf" />
+          </div>
+          <div class="field">
+            <label for="gpu-layers-b">GPU Layers (-1 = Full GPU, 0 = CPU Only, or layer count)</label>
+            <input id="gpu-layers-b" type="number" value="-1" min="-1" max="1000" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="presets">
+            <button type="button" class="btn btn-secondary btn-sm preset-btn" data-preset="shannon">Information Theory</button>
+            <button type="button" class="btn btn-secondary btn-sm preset-btn" data-preset="code">Python Code</button>
+            <button type="button" class="btn btn-secondary btn-sm preset-btn" data-preset="json">Structured JSON</button>
+            <label class="btn btn-secondary btn-sm" style="margin:0; cursor:pointer;">
+              Upload .txt File
+              <input id="compare-file-input" type="file" accept=".txt,.md,.json,.py,.csv,text/*" style="display:none;" />
+            </label>
+          </div>
+          <div class="row-inline" style="flex:0 0 auto; gap:10px;">
+            <div style="min-width:155px;">
+              <label for="cmp-streams">Parallel Streams (Speed)</label>
+              <select id="cmp-streams">
+                <option value="1" selected>1 (Best Compression)</option>
+                <option value="4">4 (Fast ~3-4x)</option>
+                <option value="8">8 (Very Fast ~6-8x)</option>
+                <option value="16">16 (Ultra Fast ~10x+)</option>
+              </select>
+            </div>
+            <div style="min-width:95px;">
+              <label for="cmp-n-ctx">n_ctx</label>
+              <input id="cmp-n-ctx" type="number" value="2048" min="32" max="131072" />
+            </div>
+            <div style="min-width:95px;">
+              <label for="cmp-cdf-bits">cdf_bits</label>
+              <input id="cmp-cdf-bits" type="number" value="28" min="18" max="30" />
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="compare-text">Original Text to Compress (UTF-8)</label>
+          <textarea id="compare-text" rows="6" class="mono"></textarea>
+        </div>
+
+        <div class="meta-line">
+          <div>
+            <span id="compare-byte-count">0 bytes / 0 chars</span>
+            <label style="display:inline-flex; align-items:center; gap:6px; margin-left:16px; cursor:pointer;">
+              <input id="cmp-fast-cdf-chk" type="checkbox" checked style="width:auto;" />
+              Fast Sparse CDF (~60x faster CDF)
+            </label>
+            <label style="display:inline-flex; align-items:center; gap:6px; margin-left:14px; cursor:pointer;">
+              <input id="collect-trace-chk" type="checkbox" checked style="width:auto;" />
+              Token surprise heatmap
+            </label>
+          </div>
+          <button id="run-compare-btn" class="btn" type="button">
+            Compress, Decompress &amp; Compare (Model A vs B)
+          </button>
+        </div>
+      </div>
+
+      <div id="compare-progress" class="progress-box">
+        <div class="prog-row">
+          <div class="prog-head">
+            <span id="prog-a-label">Model A: Waiting...</span>
+            <span id="prog-a-pct" class="mono">0%</span>
+          </div>
+          <div class="prog-track"><div id="prog-a-fill" class="prog-fill a"></div></div>
+        </div>
+        <div class="prog-row">
+          <div class="prog-head">
+            <span id="prog-b-label">Model B: Waiting...</span>
+            <span id="prog-b-pct" class="mono">0%</span>
+          </div>
+          <div class="prog-track"><div id="prog-b-fill" class="prog-fill b"></div></div>
+        </div>
+      </div>
+
+      <div id="compare-results" class="hidden">
+        <div id="winner-banner" class="winner-banner"></div>
+
+        <div class="card">
+          <div class="card-title"><span>File Size Comparison (Smaller = Better Prediction / Intelligence)</span></div>
+          <div id="size-bar-chart" class="bar-chart"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span>Detailed Comparison Table</span></div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th class="num-cell" style="color:#fcd34d;">Model A</th>
+                  <th class="num-cell" style="color:#7dd3fc;">Model B</th>
+                  <th class="num-cell">Delta (B - A)</th>
+                </tr>
+              </thead>
+              <tbody id="compare-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Token-Level Surprise / Information Heatmap (-log₂ P)</span>
+            <div class="presets">
+              <button type="button" class="btn btn-secondary btn-sm heatmap-toggle active" data-which="A">Model A</button>
+              <button type="button" class="btn btn-secondary btn-sm heatmap-toggle" data-which="B">Model B</button>
+              <button type="button" class="btn btn-secondary btn-sm heatmap-toggle" data-which="BOTH">Side by Side</button>
+            </div>
+          </div>
+          <p style="margin:0 0 10px; font-size:0.82rem; color:var(--muted);">
+            Green = model predicted the token with high probability (few bits). Orange/Red = model was surprised (many bits). Hover any token for exact probability &amp; bits.
+          </p>
+          <div id="heatmap-container"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span>Lossless Binary Verification (Round-Trip Decode)</span></div>
+          <div id="verify-grid" class="verify-grid"></div>
+        </div>
+
+        <div class="card" id="compare-json-card">
+          <div class="card-title">
+            <span>Detailed Token-by-Token JSON Export (Latest Run)</span>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <a id="dl-json-a" class="btn btn-secondary btn-sm" href="/api/compare/last/json?model=a&download=true" download="model_a_tokens.json">Model A (Full)</a>
+              <a id="dl-json-b" class="btn btn-secondary btn-sm" href="/api/compare/last/json?model=b&download=true" download="model_b_tokens.json">Model B (Full)</a>
+              <a id="dl-json-all" class="btn btn-secondary btn-sm" href="/api/compare/last/json?download=true" download="comparison_report.json">A+B (Full)</a>
+              <a id="dl-sparse-json-a" class="btn btn-secondary btn-sm" href="/api/compare/last/json?model=a&detail=sparse&download=true" download="model_a_tokens_sparse.json">Sparse A</a>
+              <a id="dl-sparse-json-b" class="btn btn-secondary btn-sm" href="/api/compare/last/json?model=b&detail=sparse&download=true" download="model_b_tokens_sparse.json">Sparse B</a>
+              <a id="dl-sparse-json-all" class="btn btn-secondary btn-sm" href="/api/compare/last/json?detail=sparse&download=true" download="comparison_report_sparse.json">Sparse A+B</a>
+            </div>
+          </div>
+          <p style="margin:0 0 10px; font-size:0.82rem; color:var(--muted);">
+            <strong>Full JSON</strong> stores all 19 technical fields per token. For longer texts, <strong>Sparse JSON</strong> keeps summary metrics, the top 10 highest-surprise tokens (<span class="mono">top_surprises</span>), and 5 core fields per token (<span class="mono">piece, prob, bits, emitted_bits, rank</span>).
+            Also available via <span class="mono">GET /api/compare/last/json</span> (<span class="mono">?model=a|b</span> and <span class="mono">&amp;detail=sparse</span>).
+          </p>
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <div class="presets">
+                <button type="button" class="btn btn-secondary btn-sm json-scope-btn active" data-scope="a">Model A JSON</button>
+                <button type="button" class="btn btn-secondary btn-sm json-scope-btn" data-scope="b">Model B JSON</button>
+                <button type="button" class="btn btn-secondary btn-sm json-scope-btn" data-scope="all">Combined (A + B)</button>
+              </div>
+              <div class="presets">
+                <button type="button" class="btn btn-secondary btn-sm json-detail-btn active" data-detail="full">Full (19 fields)</button>
+                <button type="button" class="btn btn-secondary btn-sm json-detail-btn" data-detail="sparse">Sparse (5 fields)</button>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" id="load-json-preview-btn" class="btn btn-secondary btn-sm">Load Preview</button>
+              <button type="button" id="copy-json-preview-btn" class="btn btn-secondary btn-sm">Copy JSON</button>
+            </div>
+          </div>
+          <div id="compare-json-meta" class="hash-line" style="margin-bottom:6px;">Select a scope and detail level to preview.</div>
+          <textarea id="compare-json-preview" readonly class="mono" style="width:100%; min-height:220px; font-size:0.77rem; line-height:1.4; display:none;"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: SINGLE MODEL -->
+    <section id="tab-single" class="tab-panel">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><span>1. Compress Text to `.llmc` Binary</span></div>
+          <div class="field">
+            <label for="single-comp-select">Select Model</label>
+            <select id="single-comp-select"></select>
+          </div>
+          <div class="field">
+            <label for="single-comp-path">or Full .gguf File Path</label>
+            <input id="single-comp-path" type="text" class="mono" />
+          </div>
+          <div class="row-inline field">
+            <div>
+              <label for="single-comp-streams">Parallel Streams</label>
+              <select id="single-comp-streams">
+                <option value="1" selected>1 (Best Ratio)</option>
+                <option value="4">4 (~3-4x Faster)</option>
+                <option value="8">8 (~6-8x Faster)</option>
+                <option value="16">16 (Ultra Fast)</option>
+              </select>
+            </div>
+            <div>
+              <label for="single-comp-ctx">n_ctx</label>
+              <input id="single-comp-ctx" type="number" value="2048" min="32" max="131072" />
+            </div>
+            <div>
+              <label for="single-comp-gpu">GPU Layers</label>
+              <input id="single-comp-gpu" type="number" value="-1" min="-1" max="1000" />
+            </div>
+            <div>
+              <label for="single-comp-cdf">cdf_bits</label>
+              <input id="single-comp-cdf" type="number" value="28" min="18" max="30" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="single-text">Text</label>
+            <textarea id="single-text" rows="5" class="mono">Compression is intelligence: every extra bit of predictive accuracy directly reduces the encoded bitstream.</textarea>
+          </div>
+          <div class="meta-line">
+            <div>
+              <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                <input id="single-fast-cdf-chk" type="checkbox" checked style="width:auto;" />
+                Sparse CDF
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px; margin-left:12px; cursor:pointer;">
+                <input id="single-verify-chk" type="checkbox" checked style="width:auto;" />
+                Verify round-trip decode
+              </label>
+            </div>
+            <button id="single-comp-btn" class="btn" type="button">Compress (.llmc)</button>
+          </div>
+          <div id="single-comp-progress" class="progress-box" style="margin-top:12px;">
+            <div class="prog-head">
+              <span id="single-prog-label">Preparing...</span>
+              <span id="single-prog-pct" class="mono">0%</span>
+            </div>
+            <div class="prog-track"><div id="single-prog-fill" class="prog-fill b"></div></div>
+          </div>
+          <div id="single-comp-output" class="hidden" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span>2. Decompress `.llmc` File, Hex, or Raw Bits</span></div>
+          <div class="field">
+            <label for="single-dec-select">Select Model Used for Compression</label>
+            <select id="single-dec-select"></select>
+          </div>
+          <div class="field">
+            <label for="single-dec-path">or Full .gguf File Path</label>
+            <input id="single-dec-path" type="text" class="mono" />
+          </div>
+          <div class="row-inline field">
+            <div>
+              <label for="single-dec-ctx">n_ctx</label>
+              <input id="single-dec-ctx" type="number" value="2048" min="32" max="131072" />
+            </div>
+            <div>
+              <label for="single-dec-gpu">GPU Layers</label>
+              <input id="single-dec-gpu" type="number" value="-1" min="-1" max="1000" />
+            </div>
+          </div>
+          <div class="presets" style="margin-bottom:12px;">
+            <button type="button" class="btn btn-secondary btn-sm dec-mode-btn active" data-mode="file">File (.llmc)</button>
+            <button type="button" class="btn btn-secondary btn-sm dec-mode-btn" data-mode="hex">Hex (≤ 2.5K / 10K bits)</button>
+            <button type="button" class="btn btn-secondary btn-sm dec-mode-btn" data-mode="bits">Bits (0/1, ≤ 10K bits)</button>
+          </div>
+          <div id="dec-panel-file">
+            <div class="field">
+              <label for="single-llmc-file">Choose .llmc Binary File</label>
+              <input id="single-llmc-file" type="file" accept=".llmc,application/octet-stream" />
+            </div>
+            <button id="single-dec-btn" class="btn" type="button">Decode Binary File</button>
+          </div>
+          <div id="dec-panel-hex" class="hidden">
+            <div class="field">
+              <label for="single-hex-input">Compressed Hex String (0-9 / a-f, spaces or 0x allowed, max 10,000 bits)</label>
+              <textarea id="single-hex-input" rows="5" class="mono" placeholder="4c4c4d43021c0100..."></textarea>
+              <div class="meta-line">
+                <span id="single-hex-status">0 hex (0 / 10,000 bits)</span>
+              </div>
+            </div>
+            <button id="single-dec-hex-btn" class="btn" type="button">Decode from Hex</button>
+          </div>
+          <div id="dec-panel-bits" class="hidden">
+            <div class="field">
+              <label for="single-bit-input">Compressed Bitstring (0 and 1 only, max 10,000 bits)</label>
+              <textarea id="single-bit-input" rows="5" class="mono" placeholder="01001100010011000100110101000011..."></textarea>
+              <div class="meta-line">
+                <span id="single-bit-status">0 / 10,000 bits</span>
+              </div>
+            </div>
+            <button id="single-dec-bits-btn" class="btn" type="button">Decode from Bits</button>
+          </div>
+          <div id="single-dec-output" class="hidden" style="margin-top:14px;"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const PRESETS = {
+      shannon:
+        "In 1948, Claude Shannon established information theory and proved that the fundamental limit of lossless compression is the entropy of the source. Grant Sanderson (3Blue1Brown) showed how large language models act as universal next-token predictors: combined with arithmetic coding, better prediction directly yields fewer bits.",
+      code:
+        `def binary_search(arr: list[int], target: int) -> int:\n    low, high = 0, len(arr) - 1\n    while low <= high:\n        mid = (low + high) // 2\n        if arr[mid] == target:\n            return mid\n        if arr[mid] < target:\n            low = mid + 1\n        else:\n            high = mid - 1\n    return -1\n`,
+      json:
+        JSON.stringify({
+          experiment: "LLM Arithmetic Compression",
+          method: "KV-Cache + Softmax -> Integer CDF",
+          items: [
+            { id: 1, label: "alpha", active: true, score: 0.9821 },
+            { id: 2, label: "beta", active: true, score: 0.9412 },
+            { id: 3, label: "gamma", active: false, score: 0.8755 }
+          ]
+        }, null, 2)
+    };
+
+    const state = {
+      models: [],
+      lastComparison: null,
+      heatmapMode: "A",
+      maxInlineBits: 10000,
+      decodeMode: "file",
+      bitRegistry: {},
+      jsonScope: "a",
+      jsonDetail: "full",
+      jsonCache: {}
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function showError(msg) {
+      const el = $("error-banner");
+      if (!msg) {
+        el.classList.remove("visible");
+        el.textContent = "";
+      } else {
+        el.textContent = msg;
+        el.classList.add("visible");
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function updateByteCount() {
+      const txt = $("compare-text").value;
+      const bytes = new TextEncoder().encode(txt).length;
+      $("compare-byte-count").textContent = `${bytes.toLocaleString("en-US")} bytes / ${txt.length.toLocaleString("en-US")} chars`;
+    }
+
+    function bindSelectAndPath(selectId, pathId) {
+      const sel = $(selectId);
+      const inp = $(pathId);
+      sel.addEventListener("change", () => {
+        if (sel.value) inp.value = sel.value;
+      });
+    }
+
+    function populateModelSelects(models) {
+      const pairs = [
+        ["model-a-select", "model-a-path", 0],
+        ["model-b-select", "model-b-path", models.length > 1 ? 1 : 0],
+        ["single-comp-select", "single-comp-path", 0],
+        ["single-dec-select", "single-dec-path", 0]
+      ];
+      for (const [selId, pathId, defaultIdx] of pairs) {
+        const sel = $(selId);
+        const currentPath = $(pathId).value.trim();
+        sel.innerHTML = "";
+        if (models.length === 0) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "No GGUF auto-discovered — enter path below";
+          sel.appendChild(opt);
+          continue;
+        }
+        for (const m of models) {
+          const opt = document.createElement("option");
+          opt.value = m.path;
+          opt.textContent = `${m.name} (${m.size_gb.toFixed(2)} GB)`;
+          sel.appendChild(opt);
+        }
+        const match = models.find((m) => m.path === currentPath);
+        if (match) {
+          sel.value = match.path;
+        } else {
+          const chosen = models[Math.min(defaultIdx, models.length - 1)];
+          sel.value = chosen.path;
+          $(pathId).value = chosen.path;
+        }
+      }
+    }
+
+    async function loadSystemInfo() {
+      const scanDir = $("scan-dir-input").value.trim();
+      const url = scanDir ? `/api/system?scan_dir=${encodeURIComponent(scanDir)}` : "/api/system";
+      const res = await fetch(url);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to load system info.");
+      }
+      const data = await res.json();
+      state.models = data.models || [];
+      const pill = $("gpu-pill");
+      if (data.gpu_offload_supported) {
+        pill.textContent = `GPU Offload: Active • ${state.models.length} GGUF models found`;
+        pill.className = "pill ok";
+      } else {
+        pill.textContent = `CPU Mode • ${state.models.length} GGUF models found`;
+        pill.className = "pill";
+      }
+      $("cmp-cdf-bits").value = data.default_cdf_bits || 28;
+      $("single-comp-cdf").value = data.default_cdf_bits || 28;
+      state.maxInlineBits = data.max_inline_bits || 10000;
+      updateBitInputStatus();
+      updateHexInputStatus();
+      populateModelSelects(state.models);
+    }
+
+    async function consumeSSE(response, onEvent) {
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${response.status}`);
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split(/\r?\n\r?\n/);
+        buffer = parts.pop() || "";
+        for (const block of parts) {
+          for (const line of block.split("\n")) {
+            if (line.startsWith("data: ")) {
+              const obj = JSON.parse(line.slice(6));
+              onEvent(obj);
+            }
+          }
+        }
+      }
+    }
+
+    function setProgress(which, label, pct) {
+      const k = which.toLowerCase();
+      $(`prog-${k}-label`).textContent = label;
+      $(`prog-${k}-pct`).textContent = `${pct}%`;
+      $(`prog-${k}-fill`).style.width = `${pct}%`;
+    }
+
+    function renderHeatmap(trace, title) {
+      if (!trace || trace.length === 0) {
+        return `<p style="color:var(--muted); font-size:0.85rem;">No token trace available.</p>`;
+      }
+      const MAX_HEATMAP_TOKENS = 1500;
+      const visibleTrace = trace.slice(0, MAX_HEATMAP_TOKENS);
+      const truncatedNote = trace.length > MAX_HEATMAP_TOKENS
+        ? ` <span style="color:var(--muted); font-size:0.8rem;">(showing first ${MAX_HEATMAP_TOKENS.toLocaleString("en-US")} tokens; full trace available in JSON export)</span>`
+        : "";
+      const chips = visibleTrace.map((t) => {
+        const bits = t.bits;
+        // Color scale: 0 bits -> hue 145 (green), 4 bits -> 45 (amber), >=9 bits -> 0 (red)
+        const clamped = Math.min(9, Math.max(0, bits));
+        const hue = Math.round(145 - (clamped / 9) * 145);
+        const bg = `hsla(${hue}, 72%, 38%, 0.42)`;
+        const border = `hsla(${hue}, 82%, 56%, 0.55)`;
+        const shown = t.piece.replace(/\n/g, "⏎\n").replace(/\t/g, "⇥");
+        const emitted = t.emitted_bits ?? 0;
+        const cum = typeof t.cumulative_bits === "number" ? t.cumulative_bits.toFixed(2) : "-";
+        const rank = typeof t.model_rank === "number" ? `#${t.model_rank + 1}` : "-";
+        const top1 = t.top1_piece !== undefined ? t.top1_piece.replace(/\n/g, "\\n").replace(/\t/g, "\\t") : "-";
+        const tip = `Token #${t.index} (ID: ${t.token_id}) | P = ${(t.probability * 100).toFixed(2)}% | Info = ${bits.toFixed(3)} bits | Emitted = ${emitted} bits | Cum = ${cum} bits | Rank = ${rank} | Top-1 = "${top1}"`;
+        return `<span class="tok-chip" style="background:${bg}; border-color:${border};" title="${escapeHtml(tip)}">${escapeHtml(shown || "∅")}</span>`;
+      }).join("");
+      return `<div style="margin-bottom:10px;"><strong style="font-size:0.85rem;">${escapeHtml(title)}</strong> (${trace.length} tokens)${truncatedNote}</div><div class="token-heatmap">${chips}</div>`;
+    }
+
+    function updateHeatmapView() {
+      const cmp = state.lastComparison;
+      if (!cmp) return;
+      const box = $("heatmap-container");
+      const mode = state.heatmapMode;
+      if (mode === "A") {
+        box.innerHTML = renderHeatmap(cmp.model_a.compression.token_trace, `Model A: ${cmp.model_a.model_name}`);
+      } else if (mode === "B") {
+        box.innerHTML = renderHeatmap(cmp.model_b.compression.token_trace, `Model B: ${cmp.model_b.model_name}`);
+      } else {
+        box.innerHTML =
+          renderHeatmap(cmp.model_a.compression.token_trace, `Model A: ${cmp.model_a.model_name}`) +
+          `<div style="height:14px;"></div>` +
+          renderHeatmap(cmp.model_b.compression.token_trace, `Model B: ${cmp.model_b.model_name}`);
+      }
+    }
+
+    function renderComparison(cmp) {
+      state.lastComparison = cmp;
+      $("compare-results").classList.remove("hidden");
+
+      const a = cmp.model_a;
+      const b = cmp.model_b;
+      const ac = a.compression;
+      const bc = b.compression;
+      const ad = a.decompression;
+      const bd = b.decompression;
+
+      // Winner banner
+      let winnerTitle = "Model A and Model B Tied in Size";
+      let winnerSub = `Both models produced ${ac.compressed_bytes.toLocaleString("en-US")} bytes.`;
+      if (cmp.winner_by_size === "A") {
+        const diff = bc.compressed_bytes - ac.compressed_bytes;
+        winnerTitle = `Best Compression: Model A (${a.model_name})`;
+        winnerSub = `${diff.toLocaleString("en-US")} bytes smaller than Model B (${ac.compression_ratio.toFixed(2)}x vs ${bc.compression_ratio.toFixed(2)}x, zlib -9: ${cmp.zlib_bytes} B).`;
+      } else if (cmp.winner_by_size === "B") {
+        const diff = ac.compressed_bytes - bc.compressed_bytes;
+        winnerTitle = `Best Compression: Model B (${b.model_name})`;
+        winnerSub = `${diff.toLocaleString("en-US")} bytes smaller than Model A (${bc.compression_ratio.toFixed(2)}x vs ${ac.compression_ratio.toFixed(2)}x, zlib -9: ${cmp.zlib_bytes} B).`;
+      }
+
+      $("winner-banner").innerHTML = `
+        <div>
+          <h2>${escapeHtml(winnerTitle)}</h2>
+          <p>${escapeHtml(winnerSub)}</p>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <a class="btn btn-secondary btn-sm" href="${a.download_url}" download="model_a.llmc">Download Model A .llmc (${ac.compressed_bytes} B)</a>
+          <a class="btn btn-secondary btn-sm" href="${b.download_url}" download="model_b.llmc">Download Model B .llmc (${bc.compressed_bytes} B)</a>
+        </div>
+      `;
+
+      // Bar chart
+      const maxBytes = Math.max(cmp.original_bytes, cmp.zlib_bytes, ac.compressed_bytes, bc.compressed_bytes, 1);
+      const bars = [
+        { label: "Original UTF-8", bytes: cmp.original_bytes, cls: "bar-raw" },
+        { label: "zlib -9 (Traditional ZIP)", bytes: cmp.zlib_bytes, cls: "bar-zlib" },
+        { label: `Model A (${a.model_name})`, bytes: ac.compressed_bytes, cls: "bar-a" },
+        { label: `Model B (${b.model_name})`, bytes: bc.compressed_bytes, cls: "bar-b" }
+      ];
+      $("size-bar-chart").innerHTML = bars.map((bar) => {
+        const pct = Math.max(1.5, (bar.bytes / maxBytes) * 100);
+        return `
+          <div class="bar-item">
+            <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(bar.label)}">${escapeHtml(bar.label)}</div>
+            <div class="bar-track"><div class="bar-fill ${bar.cls}" style="width:${pct.toFixed(2)}%"></div></div>
+            <div class="num">${bar.bytes.toLocaleString("en-US")} B</div>
+          </div>
+        `;
+      }).join("");
+
+      // Comparison Table
+      const formatDelta = (val, unit = "", lowerIsBetter = true, digits = 0) => {
+        const numStr = digits > 0 ? val.toFixed(digits) : val.toString();
+        const sign = val > 0 ? "+" : "";
+        let cls = "";
+        if (val !== 0) {
+          const bBetter = lowerIsBetter ? val < 0 : val > 0;
+          cls = bBetter ? "delta-pos" : "delta-neg";
+        }
+        return `<span class="${cls}">${sign}${numStr}${unit}</span>`;
+      };
+
+      const aTotal = ac.elapsed_seconds + ad.elapsed_seconds;
+      const bTotal = bc.elapsed_seconds + bd.elapsed_seconds;
+      const aTop1Pct = typeof ac.top1_hit_rate_percent === "number" ? ac.top1_hit_rate_percent.toFixed(2) : "0.00";
+      const bTop1Pct = typeof bc.top1_hit_rate_percent === "number" ? bc.top1_hit_rate_percent.toFixed(2) : "0.00";
+      const rows = [
+        ["Model File (Size)", `${escapeHtml(a.model_name)} (${a.model_size_gb} GB)`, `${escapeHtml(b.model_name)} (${b.model_size_gb} GB)`, "—"],
+        ["Encoding Mode (Streams / CDF)", `${ac.streams_used} stream / ${ac.fast_cdf ? "Sparse" : "Exact"}`, `${bc.streams_used} stream / ${bc.fast_cdf ? "Sparse" : "Exact"}`, "—"],
+        ["Compressed Binary Size (.llmc)", `${ac.compressed_bytes.toLocaleString("en-US")} B`, `${bc.compressed_bytes.toLocaleString("en-US")} B`, formatDelta(bc.compressed_bytes - ac.compressed_bytes, " B", true)],
+        ["Payload / Header", `${ac.payload_bytes.toLocaleString("en-US")} B / ${ac.header_bytes} B`, `${bc.payload_bytes.toLocaleString("en-US")} B / ${bc.header_bytes} B`, formatDelta(bc.payload_bytes - ac.payload_bytes, " B", true)],
+        ["Compression Ratio", `${ac.compression_ratio.toFixed(3)}x`, `${bc.compression_ratio.toFixed(3)}x`, formatDelta(bc.compression_ratio - ac.compression_ratio, "x", false, 3)],
+        ["Space Savings", `${ac.space_savings_percent.toFixed(2)}%`, `${bc.space_savings_percent.toFixed(2)}%`, formatDelta(bc.space_savings_percent - ac.space_savings_percent, "%", false, 2)],
+        ["Bits / Byte (Raw = 8.000)", ac.bits_per_byte.toFixed(3), bc.bits_per_byte.toFixed(3), formatDelta(bc.bits_per_byte - ac.bits_per_byte, "", true, 3)],
+        ["Token Count / Vocab Size", `${ac.num_tokens.toLocaleString("en-US")} / ${ac.vocab_size.toLocaleString("en-US")}`, `${bc.num_tokens.toLocaleString("en-US")} / ${bc.vocab_size.toLocaleString("en-US")}`, formatDelta(bc.num_tokens - ac.num_tokens, " tok", true)],
+        ["Top-1 Exact Prediction Rate", `${ac.top1_hit_count ?? 0} / ${ac.num_tokens} (${aTop1Pct}%)`, `${bc.top1_hit_count ?? 0} / ${bc.num_tokens} (${bTop1Pct}%)`, formatDelta((bc.top1_hit_rate_percent || 0) - (ac.top1_hit_rate_percent || 0), "%", false, 2)],
+        ["Bits / Token", ac.bits_per_token.toFixed(3), bc.bits_per_token.toFixed(3), formatDelta(bc.bits_per_token - ac.bits_per_token, "", true, 3)],
+        ["Theoretical Shannon Entropy", `${ac.theoretical_entropy_bits.toFixed(1)} bits (${ac.theoretical_entropy_bytes.toFixed(1)} B)`, `${bc.theoretical_entropy_bits.toFixed(1)} bits (${bc.theoretical_entropy_bytes.toFixed(1)} B)`, formatDelta(bc.theoretical_entropy_bits - ac.theoretical_entropy_bits, " bits", true, 1)],
+        ["Arithmetic Coder Efficiency", `${ac.coder_efficiency_percent.toFixed(2)}%`, `${bc.coder_efficiency_percent.toFixed(2)}%`, formatDelta(bc.coder_efficiency_percent - ac.coder_efficiency_percent, "%", false, 2)],
+        ["Load / Encode / Decode Time", `${a.load_seconds}s / ${ac.elapsed_seconds}s / ${ad.elapsed_seconds}s`, `${b.load_seconds}s / ${bc.elapsed_seconds}s / ${bd.elapsed_seconds}s`, formatDelta(bTotal - aTotal, "s (enc+dec)", true, 3)],
+        ["Binary Header (Hex)", `<span class="mono" style="font-size:0.75rem;">${escapeHtml(a.header_hex)}</span>`, `<span class="mono" style="font-size:0.75rem;">${escapeHtml(b.header_hex)}</span>`, "—"],
+        ["Lossless Verification", a.exact_match ? "✓ 100% Exact Match" : "✗ MISMATCH", b.exact_match ? "✓ 100% Exact Match" : "✗ MISMATCH", "—"]
+      ];
+
+      $("compare-table-body").innerHTML = rows.map(([metric, va, vb, vd]) => `
+        <tr>
+          <td>${escapeHtml(metric)}</td>
+          <td class="num-cell">${va}</td>
+          <td class="num-cell">${vb}</td>
+          <td class="num-cell">${vd}</td>
+        </tr>
+      `).join("");
+
+      updateHeatmapView();
+
+      state.bitRegistry = {};
+      state.jsonCache = {};
+      $("dl-json-a").href = cmp.model_a_json_url || "/api/compare/last/json?model=a&download=true";
+      $("dl-json-b").href = cmp.model_b_json_url || "/api/compare/last/json?model=b&download=true";
+      $("dl-json-all").href = cmp.report_json_url || "/api/compare/last/json?download=true";
+      $("dl-sparse-json-a").href = cmp.model_a_sparse_json_url || "/api/compare/last/json?model=a&detail=sparse&download=true";
+      $("dl-sparse-json-b").href = cmp.model_b_sparse_json_url || "/api/compare/last/json?model=b&detail=sparse&download=true";
+      $("dl-sparse-json-all").href = cmp.sparse_report_json_url || "/api/compare/last/json?detail=sparse&download=true";
+
+      $("verify-grid").innerHTML = [a, b].map((m) => `
+        <div class="verify-box">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong>Model ${m.label}: ${escapeHtml(m.model_name)}</strong>
+            <span class="pill ${m.exact_match ? "ok" : ""}">${m.exact_match ? "✓ SHA-256 & Byte Exact Match" : "✗ Mismatch"}</span>
+          </div>
+          <div class="hash-line">Original SHA-256: ${m.original_sha256}</div>
+          <div class="hash-line">Decoded  SHA-256: ${m.restored_sha256}</div>
+          <pre>${escapeHtml(m.restored_text)}</pre>
+          ${renderBitstringBlock(`cmp_${m.label}`, m, m.model_path)}
+        </div>
+      `).join("");
+
+      loadComparisonJsonPreview(state.jsonScope, state.jsonDetail).catch(() => {});
+    }
+
+    function bitstringToHex(bitstr) {
+      const clean = String(bitstr || "").replace(/\s+/g, "");
+      let hex = "";
+      for (let i = 0; i + 8 <= clean.length; i += 8) {
+        hex += parseInt(clean.slice(i, i + 8), 2).toString(16).padStart(2, "0");
+      }
+      return hex;
+    }
+
+    function hexToBitstring(hexstr) {
+      const clean = String(hexstr || "").replace(/^0x/i, "").replace(/\s+/g, "");
+      let bits = "";
+      for (let i = 0; i + 2 <= clean.length; i += 2) {
+        bits += parseInt(clean.slice(i, i + 2), 16).toString(2).padStart(8, "0");
+      }
+      return bits;
+    }
+
+    function hexToUint8Array(hexstr) {
+      let clean = String(hexstr || "").replace(/\s+/g, "");
+      if (clean.toLowerCase().startsWith("0x")) clean = clean.slice(2);
+      if (!clean || clean.length % 2 !== 0 || /[^0-9a-fA-F]/.test(clean)) {
+        throw new Error("Invalid hex string.");
+      }
+      const out = new Uint8Array(clean.length / 2);
+      for (let i = 0; i < out.length; i++) {
+        out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+      }
+      return out;
+    }
+
+    function buildClientComparisonJson(cmp, scope, detail = "full") {
+      const formatSparseModel = (m) => {
+        const c = m.compression || {};
+        const d = m.decompression || {};
+        const trace = Array.isArray(c.token_trace) ? c.token_trace : [];
+        const top1Hits = trace.filter((t) => t.model_rank === 0).length;
+        const top1Rate = trace.length > 0 ? Number(((top1Hits / trace.length) * 100).toFixed(2)) : 0;
+        const surprises = [...trace]
+          .sort((x, y) => (y.bits || 0) - (x.bits || 0))
+          .slice(0, 10)
+          .map((t) => ({
+            index: t.index,
+            piece: t.piece,
+            bits: Number((t.bits || 0).toFixed(3)),
+            prob: Number((t.probability || 0).toFixed(4)),
+            rank: t.model_rank ?? null,
+            top1: t.top1_piece ?? null
+          }));
+        return {
+          schema_version: 1,
+          detail: "sparse",
+          label: m.label,
+          model: m.model_name,
+          exact_match: m.exact_match,
+          summary: {
+            original_bytes: c.original_bytes,
+            compressed_bytes: c.compressed_bytes,
+            ratio: c.compression_ratio,
+            bits_per_byte: c.bits_per_byte,
+            num_tokens: c.num_tokens,
+            entropy_bits: c.theoretical_entropy_bits,
+            efficiency_pct: c.coder_efficiency_percent,
+            top1_hit_rate_pct: c.top1_hit_rate_percent ?? top1Rate,
+            encode_s: c.elapsed_seconds,
+            decode_s: d.elapsed_seconds
+          },
+          top_surprises: surprises,
+          tokens: trace.map((t) => ({
+            piece: t.piece,
+            prob: Number((t.probability || 0).toFixed(4)),
+            bits: Number((t.bits || 0).toFixed(3)),
+            emitted_bits: t.emitted_bits ?? null,
+            rank: t.model_rank ?? null
+          }))
+        };
+      };
+
+      const formatFullModel = (m) => {
+        const c = m.compression || {};
+        const d = m.decompression || {};
+        const trace = Array.isArray(c.token_trace) ? c.token_trace : [];
+        let cum = 0;
+        const tokens = trace.map((t) => {
+          const bits = typeof t.bits === "number" ? t.bits : 0;
+          cum = typeof t.cumulative_bits === "number" ? t.cumulative_bits : (cum + bits);
+          return {
+            ...t,
+            cumulative_bits: Number(cum.toFixed(6))
+          };
+        });
+        return {
+          label: m.label,
+          model_name: m.model_name,
+          model_path: m.model_path,
+          model_size_gb: m.model_size_gb,
+          load_seconds: m.load_seconds,
+          exact_match: m.exact_match,
+          original_sha256: m.original_sha256,
+          restored_sha256: m.restored_sha256,
+          header_hex: m.header_hex,
+          summary: {
+            original_bytes: c.original_bytes,
+            compressed_bytes: c.compressed_bytes,
+            compressed_bits: (c.compressed_bytes || 0) * 8,
+            header_bytes: c.header_bytes,
+            payload_bytes: c.payload_bytes,
+            payload_bits: (c.payload_bytes || 0) * 8,
+            num_tokens: c.num_tokens,
+            vocab_size: c.vocab_size,
+            cdf_bits: c.cdf_bits,
+            bos_token_id: c.bos_token_id,
+            streams_used: c.streams_used,
+            fast_cdf: c.fast_cdf,
+            compression_ratio: c.compression_ratio,
+            space_savings_percent: c.space_savings_percent,
+            bits_per_byte: c.bits_per_byte,
+            bits_per_token: c.bits_per_token,
+            theoretical_entropy_bits: c.theoretical_entropy_bits,
+            theoretical_entropy_bytes: c.theoretical_entropy_bytes,
+            coder_efficiency_percent: c.coder_efficiency_percent,
+            encode_seconds: c.elapsed_seconds,
+            decode_seconds: d.elapsed_seconds
+          },
+          tokens
+        };
+      };
+
+      const fn = detail === "sparse" ? formatSparseModel : formatFullModel;
+      if (scope === "a") return fn(cmp.model_a);
+      if (scope === "b") return fn(cmp.model_b);
+      if (detail === "sparse") {
+        return {
+          schema_version: 1,
+          detail: "sparse",
+          original_bytes: cmp.original_bytes,
+          original_chars: cmp.original_chars,
+          zlib_bytes: cmp.zlib_bytes,
+          zlib_ratio: cmp.zlib_ratio,
+          comparison: {
+            winner_by_size: cmp.winner_by_size,
+            byte_difference_b_minus_a: cmp.byte_difference_b_minus_a,
+            ratio_difference_a_minus_b: cmp.ratio_difference_a_minus_b,
+            entropy_difference_b_minus_a_bits: cmp.entropy_difference_b_minus_a_bits
+          },
+          model_a: fn(cmp.model_a),
+          model_b: fn(cmp.model_b)
+        };
+      }
+      return {
+        original_text: cmp.original_text,
+        original_bytes: cmp.original_bytes,
+        original_chars: cmp.original_chars,
+        zlib_bytes: cmp.zlib_bytes,
+        zlib_ratio: cmp.zlib_ratio,
+        winner_by_size: cmp.winner_by_size,
+        model_a: fn(cmp.model_a),
+        model_b: fn(cmp.model_b)
+      };
+    }
+
+    async function loadComparisonJsonPreview(scope = state.jsonScope, detail = state.jsonDetail) {
+      const cmp = state.lastComparison;
+      if (!cmp) return;
+      state.jsonScope = scope;
+      state.jsonDetail = detail;
+      document.querySelectorAll(".json-scope-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.scope === scope);
+      });
+      document.querySelectorAll(".json-detail-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.detail === detail);
+      });
+
+      const meta = $("compare-json-meta");
+      const box = $("compare-json-preview");
+      const fullUrls = {
+        a: cmp.model_a_json_url || "/api/compare/last/json?model=a",
+        b: cmp.model_b_json_url || "/api/compare/last/json?model=b",
+        all: cmp.report_json_url || "/api/compare/last/json"
+      };
+      const sparseUrls = {
+        a: cmp.model_a_sparse_json_url || "/api/compare/last/json?model=a&detail=sparse",
+        b: cmp.model_b_sparse_json_url || "/api/compare/last/json?model=b&detail=sparse",
+        all: cmp.sparse_report_json_url || "/api/compare/last/json?detail=sparse"
+      };
+      const url = (detail === "sparse" ? sparseUrls : fullUrls)[scope] || fullUrls.a;
+      const cacheKey = `${detail}:${scope}`;
+
+      let sourceNote = "";
+      if (!state.jsonCache[cacheKey]) {
+        meta.textContent = "Loading JSON...";
+        box.style.display = "none";
+        let data = null;
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            data = await res.json();
+          } else {
+            sourceNote = " | Client fallback (restart the `cli.py web` server for full backend JSON fields)";
+          }
+        } catch {
+          sourceNote = " | Client fallback";
+        }
+        if (sourceNote) {
+          for (const dMode of ["full", "sparse"]) {
+            const prefix = dMode === "sparse" ? "dl-sparse-json" : "dl-json";
+            for (const s of ["a", "b", "all"]) {
+              const txt = JSON.stringify(buildClientComparisonJson(cmp, s, dMode), null, 2);
+              state.jsonCache[`${dMode}:${s}`] = txt;
+              $(`${prefix}-${s}`).href = URL.createObjectURL(new Blob([txt], { type: "application/json;charset=utf-8" }));
+            }
+          }
+        } else {
+          state.jsonCache[cacheKey] = JSON.stringify(data, null, 2);
+        }
+      }
+
+      const fullText = state.jsonCache[cacheKey];
+
+      const MAX_PREVIEW_CHARS = 250000;
+      const truncated = fullText.length > MAX_PREVIEW_CHARS;
+      box.value = truncated
+        ? `${fullText.slice(0, MAX_PREVIEW_CHARS)}\n\n... [Preview truncated at ${MAX_PREVIEW_CHARS.toLocaleString("en-US")} characters; full data (${fullText.length.toLocaleString("en-US")} characters) is included via Download JSON or Copy]`
+        : fullText;
+      box.style.display = "block";
+      const scopeLabel = scope === "a" ? "Model A" : scope === "b" ? "Model B" : "Combined (A+B)";
+      const detailLabel = detail === "sparse" ? "Sparse (5 fields)" : "Full (19 fields)";
+      meta.textContent = `Ready: ${scopeLabel} · ${detailLabel} | ${(fullText.length / 1024).toFixed(1)} KB${sourceNote}`;
+    }
+
+    function renderBitstringMarkup(key, bitstring, hexstring, totalBits, modelPath) {
+      state.bitRegistry[key] = {
+        bitstring,
+        hexstring,
+        format: "hex",
+        modelPath
+      };
+      return `
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);" data-inline-box="${escapeHtml(key)}">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-secondary btn-sm fmt-toggle active" data-bit-key="${escapeHtml(key)}" data-fmt="hex">Hex (${hexstring.length} chars)</button>
+              <button type="button" class="btn btn-secondary btn-sm fmt-toggle" data-bit-key="${escapeHtml(key)}" data-fmt="bits">Bits (${totalBits} bits)</button>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-secondary btn-sm copy-bits-btn" data-bit-key="${escapeHtml(key)}">Copy</button>
+              <button type="button" class="btn btn-secondary btn-sm send-bits-btn" data-bit-key="${escapeHtml(key)}">Send to Decoder</button>
+            </div>
+          </div>
+          <textarea readonly rows="3" class="mono inline-preview" data-bit-key="${escapeHtml(key)}" style="font-size:0.75rem; word-break:break-all;">${hexstring}</textarea>
+        </div>
+      `;
+    }
+
+    function renderBitstringBlock(key, info, modelPath) {
+      const limit = info.max_inline_bits || state.maxInlineBits || 10000;
+      const totalBits = info.total_bits || ((info.compression && info.compression.compressed_bytes) ? info.compression.compressed_bytes * 8 : 0);
+      if (totalBits > limit) {
+        return `
+          <div class="hash-line" style="margin-top:10px; padding:8px 10px; border-radius:8px; border:1px dashed var(--border); color:#fcd34d;">
+            Output is ${totalBits.toLocaleString("en-US")} bits (${(totalBits / 4).toLocaleString("en-US")} hex chars), exceeding the ${limit.toLocaleString("en-US")}-bit inline limit — use the .llmc file download instead.
+          </div>
+        `;
+      }
+
+      let bitstring = info.bitstring || "";
+      let hexstring = info.hexstring || "";
+      if (!hexstring && bitstring) hexstring = bitstringToHex(bitstring);
+      if (!bitstring && hexstring) bitstring = hexToBitstring(hexstring);
+
+      if (bitstring && hexstring) {
+        return renderBitstringMarkup(key, bitstring, hexstring, totalBits || bitstring.length, modelPath);
+      }
+
+      if (info.download_url) {
+        const slotId = `inline-slot-${key.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+        setTimeout(async () => {
+          const slot = $(slotId);
+          if (!slot) return;
+          try {
+            const resp = await fetch(info.download_url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const bytes = new Uint8Array(await resp.arrayBuffer());
+            const bits = bytes.length * 8;
+            if (bits > limit) return;
+            const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+            const bstr = Array.from(bytes, (b) => b.toString(2).padStart(8, "0")).join("");
+            slot.innerHTML = renderBitstringMarkup(key, bstr, hex, bits, modelPath);
+          } catch {
+            slot.textContent = "Failed to fetch inline bit/hex data; use the .llmc download link above.";
+          }
+        }, 0);
+        return `<div id="${slotId}" class="hash-line" style="margin-top:10px;">Loading inline Hex/Bit output from binary file...</div>`;
+      }
+
+      return `
+        <div class="hash-line" style="margin-top:10px; padding:8px 10px; border-radius:8px; border:1px dashed var(--border); color:#fcd34d;">
+          Output is ${totalBits.toLocaleString("en-US")} bits (within the ${limit.toLocaleString("en-US")}-bit limit), but binary/inline data is unavailable.
+        </div>
+      `;
+    }
+
+    async function runComparison() {
+      showError("");
+      const text = $("compare-text").value;
+      const modelA = $("model-a-path").value.trim();
+      const modelB = $("model-b-path").value.trim();
+      if (!modelA || !modelB) {
+        showError("Please select valid .gguf file paths for both Model A and Model B.");
+        return;
+      }
+
+      $("run-compare-btn").disabled = true;
+      $("compare-progress").classList.add("visible");
+      $("compare-results").classList.add("hidden");
+      setProgress("A", "Model A queued...", 0);
+      setProgress("B", "Model B waiting...", 0);
+
+      try {
+        const res = await fetch("/api/compare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            model_a_path: modelA,
+            model_b_path: modelB,
+            n_ctx: Number($("cmp-n-ctx").value) || 2048,
+            n_gpu_layers_a: Number($("gpu-layers-a").value),
+            n_gpu_layers_b: Number($("gpu-layers-b").value),
+            cdf_bits: Number($("cmp-cdf-bits").value) || 28,
+            streams: Number($("cmp-streams").value) || 1,
+            fast_cdf: $("cmp-fast-cdf-chk").checked,
+            collect_trace: $("collect-trace-chk").checked
+          })
+        });
+
+        await consumeSSE(res, (ev) => {
+          if (ev.type === "status") {
+            const pct = ev.stage === "unloaded" ? 100 : (ev.stage === "decode" ? 50 : 5);
+            setProgress(ev.model, ev.message, pct);
+          } else if (ev.type === "progress") {
+            const frac = ev.total > 0 ? ev.current / ev.total : 1;
+            const pct = ev.phase === "encode" ? Math.round(frac * 50) : Math.round(50 + frac * 50);
+            const phaseLabel = ev.phase === "encode" ? "Encode" : "Decode";
+            setProgress(ev.model, `Model ${ev.model} ${phaseLabel}: ${ev.current} / ${ev.total} tokens`, pct);
+          } else if (ev.type === "model_done") {
+            const r = ev.result;
+            setProgress(
+              ev.model,
+              `Model ${ev.model} done: ${r.compression.compressed_bytes} B (${r.compression.compression_ratio.toFixed(2)}x)`,
+              100
+            );
+          } else if (ev.type === "complete") {
+            renderComparison(ev.comparison);
+          } else if (ev.type === "error") {
+            showError("Error: " + ev.message);
+          }
+        });
+      } catch (err) {
+        showError(err.message || String(err));
+      } finally {
+        $("run-compare-btn").disabled = false;
+      }
+    }
+
+    async function runSingleCompress() {
+      showError("");
+      const modelPath = $("single-comp-path").value.trim();
+      const text = $("single-text").value;
+      if (!modelPath) {
+        showError("Please specify a .gguf model path.");
+        return;
+      }
+
+      $("single-comp-btn").disabled = true;
+      $("single-comp-progress").classList.add("visible");
+      $("single-comp-output").classList.add("hidden");
+      $("single-prog-label").textContent = "Starting...";
+      $("single-prog-pct").textContent = "0%";
+      $("single-prog-fill").style.width = "0%";
+
+      try {
+        const res = await fetch("/api/single/compress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            model_path: modelPath,
+            n_ctx: Number($("single-comp-ctx").value) || 2048,
+            n_gpu_layers: Number($("single-comp-gpu").value),
+            cdf_bits: Number($("single-comp-cdf").value) || 28,
+            streams: Number($("single-comp-streams").value) || 1,
+            fast_cdf: $("single-fast-cdf-chk").checked,
+            verify_roundtrip: $("single-verify-chk").checked,
+            collect_trace: true
+          })
+        });
+
+        await consumeSSE(res, (ev) => {
+          if (ev.type === "status") {
+            $("single-prog-label").textContent = ev.message;
+          } else if (ev.type === "progress") {
+            const pct = Math.round((ev.current / Math.max(1, ev.total)) * 100);
+            $("single-prog-label").textContent = `${ev.phase.toUpperCase()}: ${ev.current} / ${ev.total} tokens`;
+            $("single-prog-pct").textContent = `${pct}%`;
+            $("single-prog-fill").style.width = `${pct}%`;
+          } else if (ev.type === "complete") {
+            const r = ev.result;
+            const c = r.compression;
+            $("single-prog-pct").textContent = "100%";
+            $("single-prog-fill").style.width = "100%";
+            $("single-prog-label").textContent = "Completed!";
+            const out = $("single-comp-output");
+            out.classList.remove("hidden");
+            const modelPath = $("single-comp-path").value.trim();
+            out.innerHTML = `
+              <div class="verify-box">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                  <strong>${c.original_bytes} B → ${c.compressed_bytes} B (${c.compression_ratio.toFixed(3)}x, zlib -9: ${r.zlib_bytes} B)</strong>
+                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    ${r.json_url ? `<a class="btn btn-secondary btn-sm" href="${r.json_url}" download="single_tokens.json">Download Token JSON</a>` : ""}
+                    ${r.sparse_json_url ? `<a class="btn btn-secondary btn-sm" href="${r.sparse_json_url}" download="single_tokens_sparse.json">Download Sparse JSON</a>` : ""}
+                    <a class="btn btn-secondary btn-sm" href="${r.download_url}" download="compressed.llmc">Download .llmc File</a>
+                  </div>
+                </div>
+                <div class="hash-line">Header Hex: ${escapeHtml(r.header_hex)}</div>
+                <div class="hash-line">Tokens: ${c.num_tokens} | Entropy: ${c.theoretical_entropy_bits} bits (${c.theoretical_entropy_bytes} B) | Coder Efficiency: ${c.coder_efficiency_percent}%</div>
+                ${r.exact_match !== null ? `<div style="margin-top:8px;"><span class="pill ${r.exact_match ? "ok" : ""}">${r.exact_match ? "✓ Decoded from binary file and verified exact match" : "✗ Mismatch"}</span></div>` : ""}
+                ${renderBitstringBlock("single_comp", r, modelPath)}
+                <div style="margin-top:12px;">${renderHeatmap(c.token_trace, "Token Surprise Heatmap")}</div>
+              </div>
+            `;
+          } else if (ev.type === "error") {
+            showError("Error: " + ev.message);
+          }
+        });
+      } catch (err) {
+        showError(err.message || String(err));
+      } finally {
+        $("single-comp-btn").disabled = false;
+      }
+    }
+
+    function switchDecodeMode(mode) {
+      state.decodeMode = mode;
+      document.querySelectorAll(".dec-mode-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.mode === mode);
+      });
+      $("dec-panel-file").classList.toggle("hidden", mode !== "file");
+      $("dec-panel-hex").classList.toggle("hidden", mode !== "hex");
+      $("dec-panel-bits").classList.toggle("hidden", mode !== "bits");
+    }
+
+    function updateHexInputStatus() {
+      let cleaned = $("single-hex-input").value.replace(/\s+/g, "");
+      if (cleaned.toLowerCase().startsWith("0x")) cleaned = cleaned.slice(2);
+      const limitBits = state.maxInlineBits || 10000;
+      const limitHex = Math.floor(limitBits / 4);
+      const statusEl = $("single-hex-status");
+      const btn = $("single-dec-hex-btn");
+      if (!cleaned) {
+        statusEl.textContent = `0 / ${limitHex.toLocaleString("en-US")} hex (0 / ${limitBits.toLocaleString("en-US")} bits)`;
+        statusEl.style.color = "var(--muted)";
+        btn.disabled = true;
+        return;
+      }
+      if (/[^0-9a-fA-F]/.test(cleaned)) {
+        statusEl.textContent = `Invalid character! Enter only 0-9 and a-f hex characters.`;
+        statusEl.style.color = "#fca5a5";
+        btn.disabled = true;
+        return;
+      }
+      const bits = cleaned.length * 4;
+      if (bits > limitBits) {
+        statusEl.textContent = `${cleaned.length.toLocaleString("en-US")} hex (${bits.toLocaleString("en-US")} / ${limitBits.toLocaleString("en-US")} bits) — Limit exceeded! Use File (.llmc) instead.`;
+        statusEl.style.color = "#fca5a5";
+        btn.disabled = true;
+        return;
+      }
+      if (cleaned.length % 2 !== 0) {
+        statusEl.textContent = `${cleaned.length.toLocaleString("en-US")} hex — Must be an even number of characters for whole bytes.`;
+        statusEl.style.color = "#fcd34d";
+        btn.disabled = true;
+        return;
+      }
+      statusEl.textContent = `${cleaned.length.toLocaleString("en-US")} / ${limitHex.toLocaleString("en-US")} hex (${bits.toLocaleString("en-US")} bits, ${cleaned.length / 2} bytes) — Ready to decode`;
+      statusEl.style.color = "#6ee7b7";
+      btn.disabled = false;
+    }
+
+    function updateBitInputStatus() {
+      const raw = $("single-bit-input").value;
+      const cleaned = raw.replace(/\s+/g, "");
+      const limit = state.maxInlineBits || 10000;
+      const statusEl = $("single-bit-status");
+      const btn = $("single-dec-bits-btn");
+      if (!cleaned) {
+        statusEl.textContent = `0 / ${limit.toLocaleString("en-US")} bits`;
+        statusEl.style.color = "var(--muted)";
+        btn.disabled = true;
+        return;
+      }
+      if (/[^01]/.test(cleaned)) {
+        statusEl.textContent = `Invalid character! Enter only '0' and '1' (${cleaned.length.toLocaleString("en-US")} chars).`;
+        statusEl.style.color = "#fca5a5";
+        btn.disabled = true;
+        return;
+      }
+      if (cleaned.length > limit) {
+        statusEl.textContent = `${cleaned.length.toLocaleString("en-US")} / ${limit.toLocaleString("en-US")} bits — Limit exceeded! Please use File (.llmc) instead.`;
+        statusEl.style.color = "#fca5a5";
+        btn.disabled = true;
+        return;
+      }
+      if (cleaned.length % 8 !== 0) {
+        statusEl.textContent = `${cleaned.length.toLocaleString("en-US")} / ${limit.toLocaleString("en-US")} bits — Must be a multiple of 8 for whole bytes (need ${8 - (cleaned.length % 8)} more bits).`;
+        statusEl.style.color = "#fcd34d";
+        btn.disabled = true;
+        return;
+      }
+      statusEl.textContent = `${cleaned.length.toLocaleString("en-US")} / ${limit.toLocaleString("en-US")} bits (${cleaned.length / 8} bytes) — Ready to decode`;
+      statusEl.style.color = "#6ee7b7";
+      btn.disabled = false;
+    }
+
+    function renderDecodeResult(data) {
+      const out = $("single-dec-output");
+      out.classList.remove("hidden");
+      const blobUrl = URL.createObjectURL(new Blob([data.restored_text], { type: "text/plain;charset=utf-8" }));
+      out.innerHTML = `
+        <div class="verify-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <strong>${data.compressed_bytes} B (${(data.compressed_bytes * 8).toLocaleString("en-US")} bits) → ${data.restored_bytes} B (${data.num_tokens} tokens, ${data.elapsed_seconds}s)</strong>
+            <a class="btn btn-secondary btn-sm" href="${blobUrl}" download="restored.txt">Download restored.txt</a>
+          </div>
+          <div class="hash-line">SHA-256: ${data.restored_sha256}</div>
+          <pre>${escapeHtml(data.restored_text)}</pre>
+        </div>
+      `;
+    }
+
+    async function runSingleDecompress() {
+      showError("");
+      const modelPath = $("single-dec-path").value.trim();
+      const file = $("single-llmc-file").files[0];
+      if (!modelPath || !file) {
+        showError("Please select a .gguf model and a .llmc file.");
+        return;
+      }
+
+      $("single-dec-btn").disabled = true;
+      try {
+        const bytes = await file.arrayBuffer();
+        const q = new URLSearchParams({
+          model_path: modelPath,
+          n_ctx: String(Number($("single-dec-ctx").value) || 2048),
+          n_gpu_layers: String(Number($("single-dec-gpu").value))
+        });
+        const res = await fetch(`/api/single/decompress?${q.toString()}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: bytes
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Decode failed.");
+        renderDecodeResult(data);
+      } catch (err) {
+        showError(err.message || String(err));
+      } finally {
+        $("single-dec-btn").disabled = false;
+      }
+    }
+
+    async function runSingleDecompressHex() {
+      showError("");
+      const modelPath = $("single-dec-path").value.trim();
+      const hexstring = $("single-hex-input").value;
+      if (!modelPath) {
+        showError("Please select the .gguf model file path used for encoding.");
+        return;
+      }
+
+      $("single-dec-hex-btn").disabled = true;
+      try {
+        let res = await fetch("/api/single/decompress_hex", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hexstring,
+            model_path: modelPath,
+            n_ctx: Number($("single-dec-ctx").value) || 2048,
+            n_gpu_layers: Number($("single-dec-gpu").value)
+          })
+        });
+        if (res.status === 404) {
+          const bytes = hexToUint8Array(hexstring);
+          const q = new URLSearchParams({
+            model_path: modelPath,
+            n_ctx: Number($("single-dec-ctx").value) || 2048,
+            n_gpu_layers: Number($("single-dec-gpu").value)
+          });
+          res = await fetch(`/api/single/decompress?${q.toString()}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: bytes
+          });
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Hex decode failed.");
+        renderDecodeResult(data);
+      } catch (err) {
+        showError(err.message || String(err));
+      } finally {
+        updateHexInputStatus();
+      }
+    }
+
+    async function runSingleDecompressBits() {
+      showError("");
+      const modelPath = $("single-dec-path").value.trim();
+      const bitstring = $("single-bit-input").value;
+      if (!modelPath) {
+        showError("Please select the .gguf model file path used for encoding.");
+        return;
+      }
+
+      $("single-dec-bits-btn").disabled = true;
+      try {
+        const res = await fetch("/api/single/decompress_bits", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bitstring,
+            model_path: modelPath,
+            n_ctx: Number($("single-dec-ctx").value) || 2048,
+            n_gpu_layers: Number($("single-dec-gpu").value)
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Bitstring decode failed.");
+        renderDecodeResult(data);
+      } catch (err) {
+        showError(err.message || String(err));
+      } finally {
+        updateBitInputStatus();
+      }
+    }
+
+    // Event wiring
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        $(`tab-${btn.dataset.tab}`).classList.add("active");
+      });
+    });
+
+    document.querySelectorAll(".preset-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        $("compare-text").value = PRESETS[btn.dataset.preset] || "";
+        updateByteCount();
+      });
+    });
+
+    document.querySelectorAll(".heatmap-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".heatmap-toggle").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.heatmapMode = btn.dataset.which;
+        updateHeatmapView();
+      });
+    });
+
+    $("compare-file-input").addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      $("compare-text").value = await f.text();
+      updateByteCount();
+    });
+
+    $("compare-text").addEventListener("input", updateByteCount);
+    $("run-compare-btn").addEventListener("click", runComparison);
+    $("single-comp-btn").addEventListener("click", runSingleCompress);
+    $("single-dec-btn").addEventListener("click", runSingleDecompress);
+    $("single-dec-hex-btn").addEventListener("click", runSingleDecompressHex);
+    $("single-dec-bits-btn").addEventListener("click", runSingleDecompressBits);
+    $("single-hex-input").addEventListener("input", updateHexInputStatus);
+    $("single-bit-input").addEventListener("input", updateBitInputStatus);
+    $("refresh-models-btn").addEventListener("click", () => loadSystemInfo().catch((e) => showError(e.message)));
+
+    document.querySelectorAll(".dec-mode-btn").forEach((btn) => {
+      btn.addEventListener("click", () => switchDecodeMode(btn.dataset.mode));
+    });
+
+    document.querySelectorAll(".json-scope-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        loadComparisonJsonPreview(btn.dataset.scope, state.jsonDetail).catch((e) => showError(e.message));
+      });
+    });
+
+    document.querySelectorAll(".json-detail-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        loadComparisonJsonPreview(state.jsonScope, btn.dataset.detail).catch((e) => showError(e.message));
+      });
+    });
+
+    $("load-json-preview-btn").addEventListener("click", () => {
+      loadComparisonJsonPreview(state.jsonScope, state.jsonDetail).catch((e) => showError(e.message));
+    });
+
+    $("copy-json-preview-btn").addEventListener("click", async () => {
+      const btn = $("copy-json-preview-btn");
+      try {
+        const key = `${state.jsonDetail}:${state.jsonScope}`;
+        if (!state.jsonCache[key]) {
+          await loadComparisonJsonPreview(state.jsonScope, state.jsonDetail);
+        }
+        const raw = state.jsonCache[key];
+        if (!raw) return;
+        await navigator.clipboard.writeText(raw);
+        const orig = btn.textContent;
+        btn.textContent = "Copied ✓";
+        setTimeout(() => { btn.textContent = orig; }, 1600);
+      } catch (err) {
+        showError(err?.message || "Failed to copy JSON.");
+      }
+    });
+
+    document.addEventListener("click", async (e) => {
+      const fmtBtn = e.target.closest(".fmt-toggle");
+      if (fmtBtn) {
+        const key = fmtBtn.dataset.bitKey;
+        const fmt = fmtBtn.dataset.fmt;
+        const entry = state.bitRegistry[key];
+        if (!entry) return;
+        entry.format = fmt;
+        const box = fmtBtn.closest("[data-inline-box]");
+        box.querySelectorAll(".fmt-toggle").forEach((b) => b.classList.toggle("active", b.dataset.fmt === fmt));
+        const ta = box.querySelector(".inline-preview");
+        ta.value = fmt === "hex" ? entry.hexstring : entry.bitstring;
+        return;
+      }
+      const copyBtn = e.target.closest(".copy-bits-btn");
+      if (copyBtn) {
+        const entry = state.bitRegistry[copyBtn.dataset.bitKey];
+        if (!entry) return;
+        const textToCopy = entry.format === "bits" ? entry.bitstring : entry.hexstring;
+        try {
+          await navigator.clipboard.writeText(textToCopy);
+          const orig = copyBtn.textContent;
+          copyBtn.textContent = "Copied ✓";
+          setTimeout(() => { copyBtn.textContent = orig; }, 1600);
+        } catch {
+          showError("Clipboard access denied; press Ctrl+C inside the text box to copy.");
+        }
+        return;
+      }
+      const sendBtn = e.target.closest(".send-bits-btn");
+      if (sendBtn) {
+        const entry = state.bitRegistry[sendBtn.dataset.bitKey];
+        if (!entry) return;
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === "single"));
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === "tab-single"));
+        const mode = entry.format === "bits" ? "bits" : "hex";
+        switchDecodeMode(mode);
+        if (entry.modelPath) {
+          $("single-dec-path").value = entry.modelPath;
+          const sel = $("single-dec-select");
+          if ([...sel.options].some((o) => o.value === entry.modelPath)) {
+            sel.value = entry.modelPath;
+          }
+        }
+        if (mode === "bits") {
+          $("single-bit-input").value = entry.bitstring;
+          updateBitInputStatus();
+          $("single-bit-input").scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+          $("single-hex-input").value = entry.hexstring;
+          updateHexInputStatus();
+          $("single-hex-input").scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    });
+
+    bindSelectAndPath("model-a-select", "model-a-path");
+    bindSelectAndPath("model-b-select", "model-b-path");
+    bindSelectAndPath("single-comp-select", "single-comp-path");
+    bindSelectAndPath("single-dec-select", "single-dec-path");
+
+    $("compare-text").value = PRESETS.shannon;
+    updateByteCount();
+    updateBitInputStatus();
+    updateHexInputStatus();
+    loadSystemInfo().catch((e) => showError(e.message));
+  </script>
+</body>
+</html>
